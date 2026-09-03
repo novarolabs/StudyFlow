@@ -1,8 +1,8 @@
 name: studyflow
-description: A student productivity app by Novaro Digital Labs.
+description: A modern student productivity app by Novaro Digital Labs.
 publish_to: "none"
 
-version: 1.1.0+2
+version: 2.0.0+3
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
