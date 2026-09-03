@@ -1,17 +1,21 @@
 name: studyflow
-description: A modern student organizer app built by Novaro Digital Labs.
+description: A student productivity app by Novaro Digital Labs.
 publish_to: "none"
 
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.5.3
 
-  cupertino_icons: ^1.0.6
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true

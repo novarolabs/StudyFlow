@@ -1,8 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const StudyFlowApp());
 }
+
+// =====================================================
+// APP
+// =====================================================
 
 class StudyFlowApp extends StatelessWidget {
   const StudyFlowApp({super.key});
@@ -25,6 +32,10 @@ class StudyFlowApp extends StatelessWidget {
     );
   }
 }
+
+// =====================================================
+// MAIN NAVIGATION
+// =====================================================
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -91,6 +102,10 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
+// =====================================================
+// HOME SCREEN
+// =====================================================
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -100,12 +115,15 @@ class HomeScreen extends StatelessWidget {
       icon: Icons.home,
       title: 'STUDYFLOW',
       subtitle: 'Your School Life, Organized.',
-      description: 'Welcome! Your tasks, notes and timetable will appear here.',
+      description:
+          'Welcome! Your tasks, notes and timetable will appear here.',
     );
   }
 }
 
-// ---------------- NOTES ----------------
+// =====================================================
+// NOTE MODEL
+// =====================================================
 
 class Note {
   String title;
@@ -115,7 +133,25 @@ class Note {
     required this.title,
     required this.content,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'content': content,
+    };
+  }
+
+  factory Note.fromJson(Map<String, dynamic> json) {
+    return Note(
+      title: json['title'] ?? '',
+      content: json['content'] ?? '',
+    );
+  }
 }
+
+// =====================================================
+// NOTES SCREEN
+// =====================================================
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -127,6 +163,56 @@ class NotesScreen extends StatefulWidget {
 class _NotesScreenState extends State<NotesScreen> {
   final List<Note> notes = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  // Load notes from the phone.
+  Future<void> _loadNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final String? notesString = prefs.getString('studyflow_notes');
+
+    if (notesString != null) {
+      try {
+        final List<dynamic> decodedNotes = jsonDecode(notesString);
+
+        if (!mounted) return;
+
+        setState(() {
+          notes.clear();
+
+          notes.addAll(
+            decodedNotes.map(
+              (note) => Note.fromJson(
+                Map<String, dynamic>.from(note),
+              ),
+            ),
+          );
+        });
+      } catch (e) {
+        // If saved data is corrupted, the app continues normally.
+      }
+    }
+  }
+
+  // Save notes permanently on the phone.
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final String encodedNotes = jsonEncode(
+      notes.map((note) => note.toJson()).toList(),
+    );
+
+    await prefs.setString(
+      'studyflow_notes',
+      encodedNotes,
+    );
+  }
+
+  // Create or edit a note.
   void _openNoteEditor({Note? note, int? index}) {
     final titleController = TextEditingController(
       text: note?.title ?? '',
@@ -138,7 +224,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1D2D44),
           title: Text(
@@ -146,6 +232,7 @@ class _NotesScreenState extends State<NotesScreen> {
           ),
           content: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: titleController,
@@ -157,7 +244,7 @@ class _NotesScreenState extends State<NotesScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: contentController,
-                  maxLines: 6,
+                  maxLines: 8,
                   decoration: const InputDecoration(
                     labelText: 'Write your note...',
                     border: OutlineInputBorder(),
@@ -170,12 +257,12 @@ class _NotesScreenState extends State<NotesScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final title = titleController.text.trim();
                 final content = contentController.text.trim();
 
@@ -187,18 +274,24 @@ class _NotesScreenState extends State<NotesScreen> {
                   if (note == null) {
                     notes.add(
                       Note(
-                        title: title.isEmpty ? 'Untitled Note' : title,
+                        title:
+                            title.isEmpty ? 'Untitled Note' : title,
                         content: content,
                       ),
                     );
                   } else {
                     notes[index!].title =
                         title.isEmpty ? 'Untitled Note' : title;
+
                     notes[index].content = content;
                   }
                 });
 
-                Navigator.pop(context);
+                await _saveNotes();
+
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
               },
               child: const Text('Save'),
             ),
@@ -208,10 +301,13 @@ class _NotesScreenState extends State<NotesScreen> {
     );
   }
 
-  void _deleteNote(int index) {
+  // Delete a note.
+  Future<void> _deleteNote(int index) async {
     setState(() {
       notes.removeAt(index);
     });
+
+    await _saveNotes();
   }
 
   @override
@@ -219,6 +315,7 @@ class _NotesScreenState extends State<NotesScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: const Color(0xFF0D1321),
+
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: const Color(0xFFD4AF37),
           foregroundColor: Colors.black,
@@ -228,8 +325,10 @@ class _NotesScreenState extends State<NotesScreen> {
           icon: const Icon(Icons.add),
           label: const Text('New Note'),
         ),
+
         body: Padding(
           padding: const EdgeInsets.all(20),
+
           child: notes.isEmpty
               ? const Center(
                   child: Column(
@@ -260,6 +359,7 @@ class _NotesScreenState extends State<NotesScreen> {
                     ],
                   ),
                 )
+
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -270,7 +370,9 @@ class _NotesScreenState extends State<NotesScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     const SizedBox(height: 5),
+
                     const Text(
                       'Keep your study notes organized.',
                       style: TextStyle(
@@ -278,16 +380,23 @@ class _NotesScreenState extends State<NotesScreen> {
                         fontSize: 16,
                       ),
                     ),
+
                     const SizedBox(height: 20),
+
                     Expanded(
                       child: ListView.builder(
                         itemCount: notes.length,
+
                         itemBuilder: (context, index) {
                           final note = notes[index];
 
                           return Card(
                             color: const Color(0xFF1D2D44),
-                            margin: const EdgeInsets.only(bottom: 12),
+
+                            margin: const EdgeInsets.only(
+                              bottom: 12,
+                            ),
+
                             child: ListTile(
                               title: Text(
                                 note.title,
@@ -295,22 +404,26 @@ class _NotesScreenState extends State<NotesScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+
                               subtitle: Text(
                                 note.content,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
+
                               onTap: () {
                                 _openNoteEditor(
                                   note: note,
                                   index: index,
                                 );
                               },
+
                               trailing: IconButton(
                                 icon: const Icon(
                                   Icons.delete_outline,
                                   color: Colors.redAccent,
                                 ),
+
                                 onPressed: () {
                                   _deleteNote(index);
                                 },
@@ -328,7 +441,9 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 }
 
-// ---------------- OTHER SCREENS ----------------
+// =====================================================
+// TASKS SCREEN
+// =====================================================
 
 class TasksScreen extends StatelessWidget {
   const TasksScreen({super.key});
@@ -344,6 +459,10 @@ class TasksScreen extends StatelessWidget {
   }
 }
 
+// =====================================================
+// TIMETABLE SCREEN
+// =====================================================
+
 class TimetableScreen extends StatelessWidget {
   const TimetableScreen({super.key});
 
@@ -357,6 +476,10 @@ class TimetableScreen extends StatelessWidget {
     );
   }
 }
+
+// =====================================================
+// ABOUT SCREEN
+// =====================================================
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -372,6 +495,10 @@ class AboutScreen extends StatelessWidget {
     );
   }
 }
+
+// =====================================================
+// REUSABLE SIMPLE SCREEN
+// =====================================================
 
 class SimpleScreen extends StatelessWidget {
   final IconData icon;
@@ -405,13 +532,19 @@ class SimpleScreen extends StatelessWidget {
                     size: 72,
                     color: const Color(0xFFD4AF37),
                   ),
+
                   const SizedBox(height: 20),
+
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
+
                   const SizedBox(height: 10),
+
                   Text(
                     subtitle,
                     textAlign: TextAlign.center,
@@ -420,7 +553,9 @@ class SimpleScreen extends StatelessWidget {
                       fontSize: 17,
                     ),
                   ),
+
                   const SizedBox(height: 20),
+
                   Text(
                     description,
                     textAlign: TextAlign.center,
