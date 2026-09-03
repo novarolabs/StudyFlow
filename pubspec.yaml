@@ -1,8 +1,8 @@
 name: studyflow
-description: A modern student productivity app by Novaro Digital Labs.
+description: A modern offline-first learning platform by Cypher Digital Labs.
 publish_to: "none"
 
-version: 2.0.0+3
+version: 3.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -10,11 +10,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   shared_preferences: ^2.5.3
+
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  cloud_firestore: ^5.6.12
+
+  connectivity_plus: ^6.1.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^5.0.0
 
 flutter:

@@ -1,2 +1,5 @@
 # StudyFlow
-A modern student organizer app built by Novaro Digital Labs.
+
+A modern offline-first learning platform built by Cypher Digital Labs.
+
+Designed by Papy.

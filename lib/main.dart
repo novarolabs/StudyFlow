@@ -116,7 +116,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _WelcomePageData(
       icon: Icons.school_rounded,
       title: 'Welcome to StudyFlow',
-      description:
+          'Created by Cypher Digital Labs\nDesigned by Papy',description:
           'Your school life, organized. Keep your notes, tasks and timetable in one beautiful place.',
     ),
     _WelcomePageData(
@@ -129,7 +129,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       icon: Icons.rocket_launch_rounded,
       title: 'Built for Better Learning',
       description:
-          'Created by Novaro Digital Labs\nDesigned by Papy',
+          'Created by Cypher Digital Labs\nDesigned by Papy',
     ),
   ];
 
@@ -2371,10 +2371,13 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 35),
-          InfoCard(
+            icon: Icons.business_rounded,
+  title: 'Created by',
+  value: 'Cypher Digital Labs',
+),InfoCard(
             icon: Icons.business_rounded,
             title: 'Created by',
-            value: 'Novaro Digital Labs',
+            value: 'Cypher Digital Labs',
           ),
           const SizedBox(height: 14),
           InfoCard(
