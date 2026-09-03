@@ -394,8 +394,7 @@ class SimpleScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Center(
           child: Card(
- 0
-           color: const Color(0xFF1D2D44),
+            color: const Color(0xFF1D2D44),
             child: Padding(
               padding: const EdgeInsets.all(28),
               child: Column(
