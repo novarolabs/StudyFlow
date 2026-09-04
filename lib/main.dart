@@ -1,26 +1,20 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
     await Firebase.initializeApp();
   } catch (_) {
-    // StudyFlow can still operate in offline mode.
+    // Offline mode remains available even if Firebase cannot initialize.
   }
-
   runApp(const StudyFlowApp());
 }
-
-// =====================================================
-// APP
-// =====================================================
 
 class StudyFlowApp extends StatelessWidget {
   const StudyFlowApp({super.key});
@@ -38,94 +32,233 @@ class StudyFlowApp extends StatelessWidget {
           seedColor: const Color(0xFFD4AF37),
           brightness: Brightness.dark,
         ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0B1220),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
       ),
-      home: const StartupScreen(),
+      home: const AppLoader(),
     );
   }
 }
 
 // =====================================================
-// STARTUP
+// STARTUP / ONBOARDING / AUTH
 // =====================================================
 
-class StartupScreen extends StatefulWidget {
-  const StartupScreen({super.key});
+class AppLoader extends StatefulWidget {
+  const AppLoader({super.key});
 
   @override
-  State<StartupScreen> createState() => _StartupScreenState();
+  State<AppLoader> createState() => _AppLoaderState();
 }
 
-class _StartupScreenState extends State<StartupScreen> {
+class _AppLoaderState extends State<AppLoader> {
   bool loading = true;
-  bool seenWelcome = false;
+  bool onboardingCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    checkStartup();
+    _load();
   }
 
-  Future<void> checkStartup() async {
+  Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-
+    if (!mounted) return;
     setState(() {
-      seenWelcome = prefs.getBool('seen_welcome') ?? false;
+      onboardingCompleted =
+          prefs.getBool('studyflow_onboarding_completed') ?? false;
       loading = false;
     });
+  }
+
+  Future<void> _finishWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('studyflow_onboarding_completed', true);
+    if (!mounted) return;
+    setState(() => onboardingCompleted = true);
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
-    if (!seenWelcome) {
-      return const WelcomeScreen();
+    if (!onboardingCompleted) {
+      return WelcomeScreen(onFinished: _finishWelcome);
     }
-
-    return const HomeScreen();
+    return const AuthGate();
   }
 }
 
-// =====================================================
-// WELCOME
-// =====================================================
+class WelcomeScreen extends StatefulWidget {
+  final Future<void> Function() onFinished;
+  const WelcomeScreen({super.key, required this.onFinished});
 
-class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
 
-  Future<void> continueToApp(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('seen_welcome', true);
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final controller = PageController();
+  int currentPage = 0;
 
-    if (context.mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AuthChoiceScreen(),
+  final pages = const [
+    _WelcomePageData(
+      icon: Icons.school_rounded,
+      title: 'Welcome to StudyFlow',
+      description:
+          'Your school life, organized. Keep your notes, tasks and timetable in one beautiful place.',
+    ),
+    _WelcomePageData(
+      icon: Icons.auto_awesome_rounded,
+      title: 'Stay Organized',
+      description:
+          'Write notes, track assignments and manage your weekly study schedule with ease.',
+    ),
+    _WelcomePageData(
+      icon: Icons.rocket_launch_rounded,
+      title: 'Built for Better Learning',
+      description: 'Created by Cypher Digital Labs\nDesigned by Papy',
+    ),
+  ];
+
+  Future<void> finish() async => widget.onFinished();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: finish, child: const Text('Skip')),
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: controller,
+                  itemCount: pages.length,
+                  onPageChanged: (i) => setState(() => currentPage = i),
+                  itemBuilder: (_, index) {
+                    final item = pages[index];
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1B2940),
+                              borderRadius: BorderRadius.circular(40),
+                            ),
+                            child: Icon(item.icon,
+                                size: 76, color: const Color(0xFFD4AF37)),
+                          ),
+                          const SizedBox(height: 45),
+                          Text(item.title,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 32, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 18),
+                          Text(item.description,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  height: 1.6,
+                                  color: Color(0xFFE5E7EB))),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  pages.length,
+                  (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: currentPage == i ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: currentPage == i
+                          ? const Color(0xFFD4AF37)
+                          : const Color(0xFF41516B),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 25),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (currentPage == pages.length - 1) {
+                      finish();
+                    } else {
+                      controller.nextPage(
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOut);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4AF37),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                  ),
+                  child: Text(
+                    currentPage == pages.length - 1
+                        ? 'Get Started'
+                        : 'Continue',
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+      ),
+    );
   }
+}
 
-  Future<void> continueOffline(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('seen_welcome', true);
+class _WelcomePageData {
+  final IconData icon;
+  final String title;
+  final String description;
+  const _WelcomePageData(
+      {required this.icon, required this.title, required this.description});
+}
 
-    if (context.mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
-      );
-    }
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (_, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasData) return const MainNavigation();
+        return const AuthChoiceScreen();
+      },
+    );
   }
+}
+
+class AuthChoiceScreen extends StatelessWidget {
+  const AuthChoiceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -134,90 +267,42 @@ class WelcomeScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
-
-              Container(
-                width: 130,
-                height: 130,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4AF37),
-                  borderRadius: BorderRadius.circular(35),
-                ),
-                child: const Icon(
-                  Icons.school_rounded,
-                  size: 75,
-                  color: Color(0xFF0B1220),
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              const Text(
-                'STUDYFLOW',
-                style: TextStyle(
-                  fontSize: 38,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              const Text(
-                'Your School Life, Organized.',
-                style: TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 18,
-                ),
-              ),
-
+              const Icon(Icons.school_rounded,
+                  size: 100, color: Color(0xFFD4AF37)),
               const SizedBox(height: 25),
-
-              const Text(
-                'Organize your notes, assignments, tasks and timetable in one powerful learning space.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFFCBD5E1),
-                  fontSize: 16,
-                  height: 1.6,
-                ),
+              const Text('STUDYFLOW',
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Sign in to continue your learning journey.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFFE5E7EB))),
+              const SizedBox(height: 40),
+              _GoldButton(
+                text: 'Login',
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const LoginScreen())),
               ),
-
-              const Spacer(),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => continueToApp(context),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(18),
-                  ),
-                  child: const Text(
-                    'Get Started',
-                    style: TextStyle(fontSize: 17),
-                  ),
-                ),
+              const SizedBox(height: 14),
+              OutlinedButton(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 54)),
+                child: const Text('Create Account'),
               ),
-
-              const SizedBox(height: 12),
-
-              TextButton.icon(
-                onPressed: () => continueOffline(context),
-                icon: const Icon(Icons.offline_bolt),
-                label: const Text('Continue Offline'),
-              ),
-
               const SizedBox(height: 20),
-
-              const Text(
-                'Created by Cypher Digital Labs',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MainNavigation()),
+                    (_) => false,
+                  );
+                },
+                child: const Text('Continue offline'),
               ),
-
-              const SizedBox(height: 10),
             ],
           ),
         ),
@@ -226,965 +311,483 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// =====================================================
-// AUTH CHOICE
-// =====================================================
-
-class AuthChoiceScreen extends StatelessWidget {
-  const AuthChoiceScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('StudyFlow'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const SizedBox(height: 30),
-
-            const Icon(
-              Icons.account_circle_rounded,
-              size: 90,
-              color: Color(0xFFD4AF37),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Welcome to StudyFlow',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            const Text(
-              'Choose how you want to continue.',
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.login),
-                label: const Text('Login'),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const LoginScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.person_add),
-                label: const Text('Create Account'),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const RegisterScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            TextButton.icon(
-              icon: const Icon(Icons.offline_bolt),
-              label: const Text('Use StudyFlow Offline'),
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const HomeScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =====================================================
-// LOGIN
-// =====================================================
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
-
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool busy = false;
+  bool obscure = true;
 
-  bool loading = false;
-  String error = '';
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
 
   Future<void> login() async {
-    setState(() {
-      loading = true;
-      error = '';
-    });
-
+    if (email.text.trim().isEmpty || password.text.isEmpty) {
+      _message('Enter your email and password.');
+      return;
+    }
+    setState(() => busy = true);
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      setState(() {
-        error =
-            'Unable to login. Check your internet connection and account details.';
-      });
+          email: email.text.trim(), password: password.text);
+      if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+    } on FirebaseAuthException catch (e) {
+      _message(e.message ?? 'Login failed.');
+    } catch (_) {
+      _message('Could not connect to Firebase. Check your internet connection.');
     }
-
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
+    if (mounted) setState(() => busy = false);
   }
+
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const SizedBox(height: 30),
-
-          const Icon(
-            Icons.lock_rounded,
-            size: 70,
-            color: Color(0xFFD4AF37),
+    return AuthForm(
+      title: 'Welcome Back',
+      subtitle: 'Login to your StudyFlow account.',
+      fields: [
+        TextField(
+          controller: email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+              labelText: 'Email', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: password,
+          obscureText: obscure,
+          decoration: InputDecoration(
+            labelText: 'Password',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+                icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => obscure = !obscure)),
           ),
-
-          const SizedBox(height: 30),
-
-          TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              prefixIcon: Icon(Icons.email),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              prefixIcon: Icon(Icons.lock),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          if (error.isNotEmpty) ...[
-            const SizedBox(height: 15),
-            Text(
-              error,
-              style: const TextStyle(
-                color: Colors.redAccent,
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 25),
-
-          ElevatedButton(
-            onPressed: loading ? null : login,
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: loading
-                  ? const CircularProgressIndicator()
-                  : const Text('Login'),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
+      button: busy
+          ? const Center(child: CircularProgressIndicator())
+          : _GoldButton(text: 'Login', onPressed: login),
     );
   }
 }
 
-// =====================================================
-// REGISTER
-// =====================================================
-
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
-
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final nameController = TextEditingController();
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final name = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool busy = false;
 
-  String role = 'Student';
-  bool loading = false;
-  String error = '';
+  @override
+  void dispose() {
+    name.dispose();
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
 
   Future<void> register() async {
-    setState(() {
-      loading = true;
-      error = '';
-    });
-
+    if (name.text.trim().isEmpty ||
+        email.text.trim().isEmpty ||
+        password.text.length < 6) {
+      _message('Enter your name, a valid email and a password of at least 6 characters.');
+      return;
+    }
+    setState(() => busy = true);
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email.text.trim(), password: password.text);
+      await credential.user?.updateDisplayName(name.text.trim());
       final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setString(
-        'profile_name',
-        nameController.text.trim(),
-      );
-
-      await prefs.setString(
-        'profile_role',
-        role,
-      );
-
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      setState(() {
-        error =
-            'Unable to create account. Please check your internet connection and try again.';
-      });
+      await prefs.setString('profile_name', name.text.trim());
+      if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+    } on FirebaseAuthException catch (e) {
+      _message(e.message ?? 'Account creation failed.');
+    } catch (_) {
+      _message('Could not create the account.');
     }
-
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
+    if (mounted) setState(() => busy = false);
   }
+
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthForm(
+      title: 'Create Account',
+      subtitle: 'Join StudyFlow and organize your learning.',
+      fields: [
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(
+              labelText: 'Your name', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+              labelText: 'Email', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: password,
+          obscureText: true,
+          decoration: const InputDecoration(
+              labelText: 'Password (minimum 6 characters)',
+              border: OutlineInputBorder()),
+        ),
+      ],
+      button: busy
+          ? const Center(child: CircularProgressIndicator())
+          : _GoldButton(text: 'Create Account', onPressed: register),
+    );
+  }
+}
+
+class AuthForm extends StatelessWidget {
+  final String title, subtitle;
+  final List<Widget> fields;
+  final Widget button;
+  const AuthForm(
+      {super.key,
+      required this.title,
+      required this.subtitle,
+      required this.fields,
+      required this.button});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              prefixIcon: Icon(Icons.person),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          DropdownButtonFormField<String>(
-            value: role,
-            decoration: const InputDecoration(
-              labelText: 'Account Type',
-              prefixIcon: Icon(Icons.school),
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'Student',
-                child: Text('Student'),
-              ),
-              DropdownMenuItem(
-                value: 'Teacher',
-                child: Text('Teacher'),
-              ),
-              DropdownMenuItem(
-                value: 'Tutor',
-                child: Text('Tutor'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  role = value;
-                });
-              }
-            },
-          ),
-
-          const SizedBox(height: 18),
-
-          TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              prefixIcon: Icon(Icons.email),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              prefixIcon: Icon(Icons.lock),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          if (error.isNotEmpty) ...[
-            const SizedBox(height: 15),
-            Text(
-              error,
-              style: const TextStyle(
-                color: Colors.redAccent,
-              ),
-            ),
+      appBar: AppBar(),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            const SizedBox(height: 35),
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(subtitle, style: const TextStyle(color: Color(0xFFD4AF37))),
+            const SizedBox(height: 35),
+            ...fields,
+            const SizedBox(height: 25),
+            button,
           ],
-
-          const SizedBox(height: 25),
-
-          ElevatedButton(
-            onPressed: loading ? null : register,
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: loading
-                  ? const CircularProgressIndicator()
-                  : const Text('Create Account'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
+class _GoldButton extends StatelessWidget {
+  final String text;
+  final VoidCallback onPressed;
+  const _GoldButton({required this.text, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 17)),
+          child: Text(text,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+      );
+}
+
 // =====================================================
-// HOME
+// MODELS / STORAGE
 // =====================================================
+
+class Note {
+  String title, content;
+  DateTime updatedAt;
+  Note({required this.title, required this.content, required this.updatedAt});
+  Map<String, dynamic> toJson() =>
+      {'title': title, 'content': content, 'updatedAt': updatedAt.toIso8601String()};
+  factory Note.fromJson(Map<String, dynamic> j) => Note(
+      title: j['title'] ?? '',
+      content: j['content'] ?? '',
+      updatedAt: DateTime.tryParse(j['updatedAt'] ?? '') ?? DateTime.now());
+}
+
+class StudyTask {
+  String title, description, subject, priority, dueDate;
+  bool completed;
+  StudyTask(
+      {required this.title,
+      required this.description,
+      required this.subject,
+      required this.priority,
+      required this.dueDate,
+      required this.completed});
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'subject': subject,
+        'priority': priority,
+        'dueDate': dueDate,
+        'completed': completed
+      };
+  factory StudyTask.fromJson(Map<String, dynamic> j) => StudyTask(
+      title: j['title'] ?? '',
+      description: j['description'] ?? '',
+      subject: j['subject'] ?? '',
+      priority: j['priority'] ?? 'Medium',
+      dueDate: j['dueDate'] ?? '',
+      completed: j['completed'] ?? false);
+}
+
+class TimetableItem {
+  String subject, teacher, day, startTime, endTime;
+  TimetableItem(
+      {required this.subject,
+      required this.teacher,
+      required this.day,
+      required this.startTime,
+      required this.endTime});
+  Map<String, dynamic> toJson() => {
+        'subject': subject,
+        'teacher': teacher,
+        'day': day,
+        'startTime': startTime,
+        'endTime': endTime
+      };
+  factory TimetableItem.fromJson(Map<String, dynamic> j) => TimetableItem(
+      subject: j['subject'] ?? '',
+      teacher: j['teacher'] ?? '',
+      day: j['day'] ?? 'Monday',
+      startTime: j['startTime'] ?? '08:00',
+      endTime: j['endTime'] ?? '09:00');
+}
+
+class StorageService {
+  static const notesKey = 'studyflow_notes';
+  static const tasksKey = 'studyflow_tasks';
+  static const timetableKey = 'studyflow_timetable';
+
+  static Future<List<T>> _load<T>(
+      String key, T Function(Map<String, dynamic>) fromJson) async {
+    final data = (await SharedPreferences.getInstance()).getString(key);
+    if (data == null) return [];
+    try {
+      return (jsonDecode(data) as List)
+          .map((e) => fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> _save<T>(
+      String key, List<T> data, Map<String, dynamic> Function(T) toJson) async {
+    await (await SharedPreferences.getInstance())
+        .setString(key, jsonEncode(data.map(toJson).toList()));
+  }
+
+  static Future<List<Note>> loadNotes() => _load(notesKey, Note.fromJson);
+  static Future<void> saveNotes(List<Note> v) =>
+      _save(notesKey, v, (x) => x.toJson());
+  static Future<List<StudyTask>> loadTasks() => _load(tasksKey, StudyTask.fromJson);
+  static Future<void> saveTasks(List<StudyTask> v) =>
+      _save(tasksKey, v, (x) => x.toJson());
+  static Future<List<TimetableItem>> loadTimetable() =>
+      _load(timetableKey, TimetableItem.fromJson);
+  static Future<void> saveTimetable(List<TimetableItem> v) =>
+      _save(timetableKey, v, (x) => x.toJson());
+}
+
+// =====================================================
+// NAVIGATION / HOME
+// =====================================================
+
+class MainNavigation extends StatefulWidget {
+  const MainNavigation({super.key});
+  @override
+  State<MainNavigation> createState() => _MainNavigationState();
+}
+
+class _MainNavigationState extends State<MainNavigation> {
+  int selectedIndex = 0;
+  late final List<Widget> pages;
+
+  @override
+  void initState() {
+    super.initState();
+    pages = [
+      HomeScreen(onNavigate: (i) => setState(() => selectedIndex = i)),
+      const NotesScreen(),
+      const TasksScreen(),
+      const TimetableScreen(),
+      const GroupsScreen(),
+      const ProfileScreen(),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: IndexedStack(index: selectedIndex, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => setState(() => selectedIndex = i),
+          backgroundColor: const Color(0xFF121D2F),
+          indicatorColor: const Color(0xFFD4AF37),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+            NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Notes'),
+            NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Tasks'),
+            NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Schedule'),
+            NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Groups'),
+            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
+      );
+}
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
+  final ValueChanged<int> onNavigate;
+  const HomeScreen({super.key, required this.onNavigate});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int index = 0;
-
-  final screens = const [
-    DashboardScreen(),
-    TasksScreen(),
-    TimetableScreen(),
-    NotesScreen(),
-    GroupsScreen(),
-    ProfileScreen(),
-  ];
-
-  final titles = [
-    'Dashboard',
-    'Tasks',
-    'Timetable',
-    'Notes',
-    'Groups',
-    'Profile',
-  ];
+  int noteCount = 0, pendingTaskCount = 0, todayClassCount = 0;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(titles[index]),
-      ),
-      body: screens[index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (value) {
-          setState(() {
-            index = value;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
-            label: 'Schedule',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.note_outlined),
-            selectedIcon: Icon(Icons.note),
-            label: 'Notes',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups),
-            label: 'Groups',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
+  void initState() {
+    super.initState();
+    loadDashboard();
   }
-}
 
-// =====================================================
-// DASHBOARD
-// =====================================================
+  Future<void> loadDashboard() async {
+    final n = await StorageService.loadNotes();
+    final t = await StorageService.loadTasks();
+    final s = await StorageService.loadTimetable();
+    final day = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
+    if (!mounted) return;
+    setState(() {
+      noteCount = n.length;
+      pendingTaskCount = t.where((x) => !x.completed).length;
+      todayClassCount = s.where((x) => x.day == day).length;
+    });
+  }
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
-
-  Future<bool> isOnline() async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none;
+  String greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning 👋';
+    if (h < 18) return 'Good afternoon 👋';
+    return 'Good evening 👋';
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: isOnline(),
-      builder: (context, snapshot) {
-        final online = snapshot.data ?? false;
-
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Row(
-              children: [
-                Icon(
-                  online ? Icons.cloud_done : Icons.cloud_off,
-                  color: online
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  online
-                      ? 'Online and ready to sync'
-                      : 'Offline mode active',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Your Learning Hub',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            const Text(
-              'Stay organized and keep your school life under control.',
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const DashboardCard(
-              icon: Icons.checklist,
-              title: 'Tasks',
-              subtitle: 'Plan and complete your assignments',
-            ),
-
-            const SizedBox(height: 15),
-
-            const DashboardCard(
-              icon: Icons.calendar_month,
-              title: 'Timetable',
-              subtitle: 'Keep track of your classes',
-            ),
-
-            const SizedBox(height: 15),
-
-            const DashboardCard(
-              icon: Icons.note,
-              title: 'Offline Notes',
-              subtitle: 'Read and write notes without internet',
-            ),
-
-            const SizedBox(height: 15),
-
-            const DashboardCard(
-              icon: Icons.groups,
-              title: 'Learning Groups',
-              subtitle: 'Connect with students, teachers and tutors',
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => SafeArea(
+        child: RefreshIndicator(
+          onRefresh: loadDashboard,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(greeting(), style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 17)),
+              const SizedBox(height: 5),
+              const Text('STUDYFLOW', style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Your school life, organized.', style: TextStyle(fontSize: 16, color: Color(0xFFE5E7EB))),
+              const SizedBox(height: 28),
+              Row(children: [
+                Expanded(child: DashboardCard(icon: Icons.menu_book_rounded, title: 'Notes', value: '$noteCount', subtitle: 'Saved notes', onTap: () => widget.onNavigate(1))),
+                const SizedBox(width: 14),
+                Expanded(child: DashboardCard(icon: Icons.checklist_rounded, title: 'Tasks', value: '$pendingTaskCount', subtitle: 'Pending', onTap: () => widget.onNavigate(2))),
+              ]),
+              const SizedBox(height: 14),
+              DashboardCard(icon: Icons.calendar_month_rounded, title: 'Today', value: '$todayClassCount classes', subtitle: 'View your schedule', wide: true, onTap: () => widget.onNavigate(3)),
+              const SizedBox(height: 30),
+              const Text('Quick Actions', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              QuickAction(icon: Icons.note_add_outlined, title: 'Create a new note', subtitle: 'Capture an idea or study material', onTap: () => widget.onNavigate(1)),
+              const SizedBox(height: 12),
+              QuickAction(icon: Icons.add_task, title: 'Add a task', subtitle: 'Keep track of homework and assignments', onTap: () => widget.onNavigate(2)),
+            ],
+          ),
+        ),
+      );
 }
 
 class DashboardCard extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const DashboardCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+  final String title, value, subtitle;
+  final VoidCallback onTap;
+  final bool wide;
+  const DashboardCard({super.key, required this.icon, required this.title, required this.value, required this.subtitle, required this.onTap, this.wide = false});
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          icon,
-          size: 35,
-          color: const Color(0xFFD4AF37),
-        ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-      ),
-    );
-  }
-}
-
-// =====================================================
-// TASKS
-// =====================================================
-
-class Task {
-  String title;
-  bool completed;
-  String priority;
-
-  Task({
-    required this.title,
-    this.completed = false,
-    this.priority = 'Normal',
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'title': title,
-      'completed': completed,
-      'priority': priority,
-    };
-  }
-
-  factory Task.fromJson(Map<String, dynamic> json) {
-    return Task(
-      title: json['title'] ?? '',
-      completed: json['completed'] ?? false,
-      priority: json['priority'] ?? 'Normal',
-    );
-  }
-}
-
-class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
-
-  @override
-  State<TasksScreen> createState() => _TasksScreenState();
-}
-
-class _TasksScreenState extends State<TasksScreen> {
-  List<Task> tasks = [];
-
-  @override
-  void initState() {
-    super.initState();
-    loadTasks();
-  }
-
-  Future<void> loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('tasks');
-
-    if (saved != null) {
-      final List data = jsonDecode(saved);
-
-      setState(() {
-        tasks = data
-            .map((item) => Task.fromJson(item))
-            .toList();
-      });
-    }
-  }
-
-  Future<void> saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final data = tasks
-        .map((task) => task.toJson())
-        .toList();
-
-    await prefs.setString(
-      'tasks',
-      jsonEncode(data),
-    );
-  }
-
-  Future<void> addTask() async {
-    final controller = TextEditingController();
-    String priority = 'Normal';
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, dialogSetState) {
-            return AlertDialog(
-              title: const Text('New Task'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'Task title',
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  DropdownButtonFormField<String>(
-                    value: priority,
-                    decoration: const InputDecoration(
-                      labelText: 'Priority',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Low',
-                        child: Text('Low'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Normal',
-                        child: Text('Normal'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'High',
-                        child: Text('High'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        dialogSetState(() {
-                          priority = value;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (controller.text.trim().isEmpty) {
-                      return;
-                    }
-
-                    setState(() {
-                      tasks.add(
-                        Task(
-                          title: controller.text.trim(),
-                          priority: priority,
-                        ),
-                      );
-                    });
-
-                    await saveTasks();
-
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Add'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (tasks.isEmpty) {
-      return Scaffold(
-        body: const Center(
-          child: Text(
-            'No tasks yet.\nStart organizing your work!',
-            textAlign: TextAlign.center,
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: addTask,
-          child: const Icon(Icons.add),
+  Widget build(BuildContext context) => InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: const Color(0xFF162238), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFF273650))),
+          child: wide
+              ? Row(children: [
+                  Icon(icon, size: 42, color: const Color(0xFFD4AF37)),
+                  const SizedBox(width: 18),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: const TextStyle(color: Color(0xFFE5E7EB))),
+                  ])),
+                  Text(value, style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold)),
+                ])
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(icon, color: const Color(0xFFD4AF37)),
+                  const SizedBox(height: 20),
+                  Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFFE5E7EB))),
+                ]),
         ),
       );
-    }
-
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(15),
-        itemCount: tasks.length,
-        itemBuilder: (context, index) {
-          final task = tasks[index];
-
-          return Card(
-            child: CheckboxListTile(
-              value: task.completed,
-              title: Text(
-                task.title,
-                style: TextStyle(
-                  decoration: task.completed
-                      ? TextDecoration.lineThrough
-                      : null,
-                ),
-              ),
-              subtitle: Text(
-                'Priority: ${task.priority}',
-              ),
-              onChanged: (value) async {
-                setState(() {
-                  task.completed = value ?? false;
-                });
-
-                await saveTasks();
-              },
-              secondary: IconButton(
-                icon: const Icon(
-                  Icons.delete_outline,
-                ),
-                onPressed: () async {
-                  setState(() {
-                    tasks.removeAt(index);
-                  });
-
-                  await saveTasks();
-                },
-              ),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addTask,
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
 }
 
-// =====================================================
-// TIMETABLE
-// =====================================================
-
-class TimetableScreen extends StatefulWidget {
-  const TimetableScreen({super.key});
-
+class QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback onTap;
+  const QuickAction({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap});
   @override
-  State<TimetableScreen> createState() =>
-      _TimetableScreenState();
-}
-
-class _TimetableScreenState extends State<TimetableScreen> {
-  List<String> classes = [];
-
-  @override
-  void initState() {
-    super.initState();
-    loadClasses();
-  }
-
-  Future<void> loadClasses() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    setState(() {
-      classes =
-          prefs.getStringList('classes') ?? [];
-    });
-  }
-
-  Future<void> saveClasses() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      'classes',
-      classes,
-    );
-  }
-
-  Future<void> addClass() async {
-    final controller = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Class'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Subject / Class',
-              hintText: 'Example: Mathematics - Monday 8:00 AM',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (controller.text.trim().isEmpty) {
-                  return;
-                }
-
-                setState(() {
-                  classes.add(
-                    controller.text.trim(),
-                  );
-                });
-
-                await saveClasses();
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: classes.isEmpty
-          ? const Center(
-              child: Text(
-                'Your timetable is empty.\nAdd your first class.',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: classes.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.school,
-                      color: Color(0xFFD4AF37),
-                    ),
-                    title: Text(classes[index]),
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                      ),
-                      onPressed: () async {
-                        setState(() {
-                          classes.removeAt(index);
-                        });
-
-                        await saveClasses();
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addClass,
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        tileColor: const Color(0xFF162238),
+        leading: CircleAvatar(backgroundColor: const Color(0xFF253A5A), child: Icon(icon, color: const Color(0xFFD4AF37))),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: onTap,
+      );
 }
 
 // =====================================================
@@ -1193,398 +796,303 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
-
   @override
   State<NotesScreen> createState() => _NotesScreenState();
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  List<String> notes = [];
-
+  List<Note> notes = [];
+  bool loading = true;
   @override
-  void initState() {
-    super.initState();
+  void initState() { super.initState(); loadNotes(); }
+
+  Future<void> loadNotes() async {
+    final n = await StorageService.loadNotes();
+    n.sort((a,b) => b.updatedAt.compareTo(a.updatedAt));
+    if (mounted) setState(() { notes = n; loading = false; });
+  }
+
+  Future<void> openEditor({Note? note, int? index}) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => NoteEditorScreen(
+      note: note,
+      onSave: (saved) async {
+        setState(() {
+          if (note == null) notes.add(saved); else notes[index!] = saved;
+          notes.sort((a,b) => b.updatedAt.compareTo(a.updatedAt));
+        });
+        await StorageService.saveNotes(notes);
+      },
+    )));
     loadNotes();
   }
 
-  Future<void> loadNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    setState(() {
-      notes =
-          prefs.getStringList('notes') ?? [];
-    });
-  }
-
-  Future<void> saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setStringList(
-      'notes',
-      notes,
-    );
-  }
-
-  Future<void> addNote() async {
-    final controller = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('New Note'),
-          content: TextField(
-            controller: controller,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              hintText: 'Write your note here...',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (controller.text.trim().isEmpty) {
-                  return;
-                }
-
-                setState(() {
-                  notes.add(
-                    controller.text.trim(),
-                  );
-                });
-
-                await saveNotes();
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> deleteNote(int index) async {
+    final yes = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
+      title: const Text('Delete Note?'),
+      content: Text('Delete "${notes[index].title}" permanently?'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+      ],
+    ));
+    if (yes == true) { setState(() => notes.removeAt(index)); await StorageService.saveNotes(notes); }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: notes.isEmpty
-          ? const Center(
-              child: Text(
-                'No notes yet.\nYour offline notes will appear here.',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: notes.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.note,
-                      color: Color(0xFFD4AF37),
-                    ),
-                    title: Text(
-                      notes[index],
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () {},
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                      ),
-                      onPressed: () async {
-                        setState(() {
-                          notes.removeAt(index);
-                        });
+  Widget build(BuildContext context) => SafeArea(child: Scaffold(
+    floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black, onPressed: () => openEditor(), child: const Icon(Icons.add)),
+    body: loading ? const Center(child: CircularProgressIndicator()) : notes.isEmpty
+      ? const EmptyState(icon: Icons.menu_book_rounded, title: 'No notes yet', message: 'Create your first note and keep your study ideas organized.')
+      : ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: notes.length + 1,
+          itemBuilder: (_, i) {
+            if (i == 0) return const _ScreenHeader(title: 'My Notes', subtitle: 'Keep your study materials organized.');
+            final index = i - 1; final note = notes[index];
+            return Card(color: const Color(0xFF162238), margin: const EdgeInsets.only(bottom: 12), child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFF253A5A), child: Icon(Icons.description_outlined, color: Color(0xFFD4AF37))),
+              title: Text(note.title.isEmpty ? 'Untitled Note' : note.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(note.content.trim().isEmpty ? 'No additional text' : note.content.trim(), maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => deleteNote(index)),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NoteViewerScreen(note: note, onEdit: () async {
+                Navigator.pop(context); await openEditor(note: note, index: index);
+              }))),
+            ));
+          },
+        ),
+  ));
+}
 
-                        await saveNotes();
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addNote,
-        child: const Icon(Icons.add),
-      ),
-    );
+class NoteViewerScreen extends StatelessWidget {
+  final Note note;
+  final Future<void> Function() onEdit;
+  const NoteViewerScreen({super.key, required this.note, required this.onEdit});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Note'), actions: [IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined))]),
+    body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(note.title.isEmpty ? 'Untitled Note' : note.title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      Text('Last updated ${formatDate(note.updatedAt)}', style: const TextStyle(color: Color(0xFFD4AF37))),
+      const SizedBox(height: 25), const Divider(), const SizedBox(height: 20),
+      SelectableText(note.content.isEmpty ? 'No content in this note.' : note.content, style: const TextStyle(fontSize: 18, height: 1.7)),
+    ]),
+  );
+}
+
+class NoteEditorScreen extends StatefulWidget {
+  final Note? note;
+  final Future<void> Function(Note) onSave;
+  const NoteEditorScreen({super.key, this.note, required this.onSave});
+  @override State<NoteEditorScreen> createState() => _NoteEditorScreenState();
+}
+class _NoteEditorScreenState extends State<NoteEditorScreen> {
+  late final TextEditingController title, content;
+  @override void initState() { super.initState(); title = TextEditingController(text: widget.note?.title ?? ''); content = TextEditingController(text: widget.note?.content ?? ''); }
+  @override void dispose() { title.dispose(); content.dispose(); super.dispose(); }
+  Future<void> save() async {
+    if (title.text.trim().isEmpty && content.text.trim().isEmpty) return;
+    await widget.onSave(Note(title: title.text.trim().isEmpty ? 'Untitled Note' : title.text.trim(), content: content.text.trim(), updatedAt: DateTime.now()));
+    if (mounted) Navigator.pop(context);
   }
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.note == null ? 'New Note' : 'Edit Note'), actions: [TextButton(onPressed: save, child: const Text('SAVE', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold)))]),
+    body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
+      TextField(controller: title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), decoration: const InputDecoration(hintText: 'Title', border: InputBorder.none)),
+      const Divider(),
+      Expanded(child: TextField(controller: content, maxLines: null, expands: true, textAlignVertical: TextAlignVertical.top, style: const TextStyle(fontSize: 18, height: 1.6), decoration: const InputDecoration(hintText: 'Start writing your note...', border: InputBorder.none))),
+    ])),
+  );
 }
 
 // =====================================================
-// GROUPS
+// TASKS
+// =====================================================
+
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key});
+  @override State<TasksScreen> createState() => _TasksScreenState();
+}
+class _TasksScreenState extends State<TasksScreen> {
+  List<StudyTask> tasks = []; bool loading = true;
+  @override void initState() { super.initState(); load(); }
+  Future<void> load() async { final v = await StorageService.loadTasks(); if (mounted) setState(() { tasks=v; loading=false; }); }
+  Future<void> save() => StorageService.saveTasks(tasks);
+  Future<void> edit({StudyTask? task, int? index}) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => TaskEditorScreen(task: task, onSave: (x) async {
+      setState(() { if(task==null) tasks.add(x); else tasks[index!]=x; }); await save();
+    })));
+    load();
+  }
+  @override Widget build(BuildContext context) {
+    final pending = tasks.where((x)=>!x.completed).toList(), completed = tasks.where((x)=>x.completed).toList();
+    return SafeArea(child: Scaffold(
+      floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black, onPressed: ()=>edit(), child: const Icon(Icons.add)),
+      body: loading ? const Center(child:CircularProgressIndicator()) : tasks.isEmpty
+        ? const EmptyState(icon: Icons.checklist_rounded,title:'No tasks yet',message:'Add homework, assignments and study goals here.')
+        : ListView(padding: const EdgeInsets.all(20), children:[
+          const _ScreenHeader(title:'My Tasks',subtitle:'Stay on top of your work.'),
+          if(pending.isNotEmpty) const SectionTitle(title:'Pending'),
+          ...pending.map((x)=>_taskTile(x,tasks.indexOf(x))),
+          if(completed.isNotEmpty) ...[const SizedBox(height:20), const SectionTitle(title:'Completed'), ...completed.map((x)=>_taskTile(x,tasks.indexOf(x)))],
+        ]),
+    ));
+  }
+  Widget _taskTile(StudyTask task,int index)=>Card(color:const Color(0xFF162238),child:ListTile(
+    leading: Checkbox(value:task.completed,activeColor:const Color(0xFFD4AF37),onChanged:(_){setState(()=>task.completed=!task.completed);save();}),
+    title: Text(task.title,style:TextStyle(fontWeight:FontWeight.bold,decoration:task.completed?TextDecoration.lineThrough:null)),
+    subtitle: Text('${task.subject.isEmpty?'General':task.subject} • ${task.priority}${task.dueDate.isEmpty?'':' • Due ${task.dueDate}'}'),
+    trailing: IconButton(icon:const Icon(Icons.delete_outline,color:Colors.redAccent),onPressed:(){setState(()=>tasks.removeAt(index));save();}),
+    onTap:()=>edit(task:task,index:index),
+  ));
+}
+
+class TaskEditorScreen extends StatefulWidget {
+  final StudyTask? task; final Future<void> Function(StudyTask) onSave;
+  const TaskEditorScreen({super.key,this.task,required this.onSave});
+  @override State<TaskEditorScreen> createState()=>_TaskEditorScreenState();
+}
+class _TaskEditorScreenState extends State<TaskEditorScreen>{
+  late final TextEditingController title,description,subject,due; String priority='Medium';
+  @override void initState(){super.initState(); final t=widget.task; title=TextEditingController(text:t?.title??'');description=TextEditingController(text:t?.description??'');subject=TextEditingController(text:t?.subject??'');due=TextEditingController(text:t?.dueDate??'');priority=t?.priority??'Medium';}
+  @override void dispose(){title.dispose();description.dispose();subject.dispose();due.dispose();super.dispose();}
+  Future<void> pickDate()async{final d=await showDatePicker(context:context,initialDate:DateTime.now(),firstDate:DateTime(2024),lastDate:DateTime(2100));if(d!=null)setState(()=>due.text='${d.day}/${d.month}/${d.year}');}
+  Future<void> save()async{if(title.text.trim().isEmpty)return;await widget.onSave(StudyTask(title:title.text.trim(),description:description.text.trim(),subject:subject.text.trim(),priority:priority,dueDate:due.text.trim(),completed:widget.task?.completed??false));if(mounted)Navigator.pop(context);}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.task==null?'New Task':'Edit Task'),actions:[TextButton(onPressed:save,child:const Text('SAVE',style:TextStyle(color:Color(0xFFD4AF37),fontWeight:FontWeight.bold)))]),body:ListView(padding:const EdgeInsets.all(20),children:[
+    TextField(controller:title,decoration:const InputDecoration(labelText:'Task title',border:OutlineInputBorder())),const SizedBox(height:16),
+    TextField(controller:description,maxLines:4,decoration:const InputDecoration(labelText:'Description',border:OutlineInputBorder())),const SizedBox(height:16),
+    TextField(controller:subject,decoration:const InputDecoration(labelText:'Subject',border:OutlineInputBorder())),const SizedBox(height:16),
+    DropdownButtonFormField<String>(value:priority,decoration:const InputDecoration(labelText:'Priority',border:OutlineInputBorder()),items:const [DropdownMenuItem(value:'High',child:Text('High')),DropdownMenuItem(value:'Medium',child:Text('Medium')),DropdownMenuItem(value:'Low',child:Text('Low'))],onChanged:(v){if(v!=null)setState(()=>priority=v);}),const SizedBox(height:16),
+    TextField(controller:due,readOnly:true,onTap:pickDate,decoration:const InputDecoration(labelText:'Due date',suffixIcon:Icon(Icons.calendar_today),border:OutlineInputBorder())),
+  ]));
+}
+
+// =====================================================
+// TIMETABLE
+// =====================================================
+
+class TimetableScreen extends StatefulWidget { const TimetableScreen({super.key}); @override State<TimetableScreen> createState()=>_TimetableScreenState(); }
+class _TimetableScreenState extends State<TimetableScreen>{
+  List<TimetableItem> items=[]; bool loading=true;
+  final days=const['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{final v=await StorageService.loadTimetable();if(mounted)setState(()=>{items=v,loading=false});}
+  Future<void> save()=>StorageService.saveTimetable(items);
+  Future<void> edit({TimetableItem? item,int? index})async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>TimetableEditorScreen(item:item,onSave:(x)async{setState((){if(item==null)items.add(x);else items[index!]=x;items.sort((a,b)=>a.startTime.compareTo(b.startTime));});await save();})));load();}
+  @override Widget build(BuildContext context)=>SafeArea(child:Scaffold(floatingActionButton:FloatingActionButton(backgroundColor:const Color(0xFFD4AF37),foregroundColor:Colors.black,onPressed:()=>edit(),child:const Icon(Icons.add)),body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(20),children:[
+    const _ScreenHeader(title:'Timetable',subtitle:'Plan your school week.'),
+    if(items.isEmpty)const Padding(padding:EdgeInsets.only(top:80),child:EmptyState(icon:Icons.calendar_month,title:'Your timetable is empty',message:'Add your classes to build your weekly schedule.')),
+    ...days.map((day){final list=items.where((x)=>x.day==day).toList();if(list.isEmpty)return const SizedBox();return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[SectionTitle(title:day),...list.map((x){final i=items.indexOf(x);return Card(color:const Color(0xFF162238),child:ListTile(leading:const CircleAvatar(backgroundColor:Color(0xFF253A5A),child:Icon(Icons.school_outlined,color:Color(0xFFD4AF37))),title:Text(x.subject,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text('${x.startTime} – ${x.endTime}${x.teacher.isEmpty?'':'\n${x.teacher}'}'),isThreeLine:x.teacher.isNotEmpty,onTap:()=>edit(item:x,index:i),trailing:IconButton(icon:const Icon(Icons.delete_outline,color:Colors.redAccent),onPressed:(){setState(()=>items.removeAt(i));save();})));}),const SizedBox(height:18)]);} ),
+  ])));
+}
+
+class TimetableEditorScreen extends StatefulWidget{
+  final TimetableItem? item; final Future<void> Function(TimetableItem) onSave;
+  const TimetableEditorScreen({super.key,this.item,required this.onSave});
+  @override State<TimetableEditorScreen> createState()=>_TimetableEditorScreenState();
+}
+class _TimetableEditorScreenState extends State<TimetableEditorScreen>{
+  late final TextEditingController subject,teacher; String day='Monday'; TimeOfDay start=const TimeOfDay(hour:8,minute:0),end=const TimeOfDay(hour:9,minute:0);
+  final days=const['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  @override void initState(){super.initState();subject=TextEditingController(text:widget.item?.subject??'');teacher=TextEditingController(text:widget.item?.teacher??'');day=widget.item?.day??'Monday';if(widget.item!=null){start=parse(widget.item!.startTime);end=parse(widget.item!.endTime);}}
+  TimeOfDay parse(String s){try{final p=s.split(':');return TimeOfDay(hour:int.parse(p[0]),minute:int.parse(p[1]));}catch(_){return const TimeOfDay(hour:8,minute:0);}}
+  String fmt(TimeOfDay t)=>'${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
+  Future<void> pick(bool isStart)async{final v=await showTimePicker(context:context,initialTime:isStart?start:end);if(v!=null)setState(()=>isStart?start=v:end=v);}
+  Future<void> save()async{if(subject.text.trim().isEmpty)return;await widget.onSave(TimetableItem(subject:subject.text.trim(),teacher:teacher.text.trim(),day:day,startTime:fmt(start),endTime:fmt(end)));if(mounted)Navigator.pop(context);}
+  @override void dispose(){subject.dispose();teacher.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.item==null?'Add Class':'Edit Class'),actions:[TextButton(onPressed:save,child:const Text('SAVE',style:TextStyle(color:Color(0xFFD4AF37),fontWeight:FontWeight.bold)))]),body:ListView(padding:const EdgeInsets.all(20),children:[
+    TextField(controller:subject,decoration:const InputDecoration(labelText:'Subject',border:OutlineInputBorder())),const SizedBox(height:16),
+    TextField(controller:teacher,decoration:const InputDecoration(labelText:'Teacher / Tutor (optional)',border:OutlineInputBorder())),const SizedBox(height:16),
+    DropdownButtonFormField<String>(value:day,decoration:const InputDecoration(labelText:'Day',border:OutlineInputBorder()),items:days.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null)setState(()=>day=v);}),const SizedBox(height:16),
+    ListTile(shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12),side:const BorderSide(color:Color(0xFF41516B))),title:const Text('Start time'),subtitle:Text(fmt(start)),trailing:const Icon(Icons.access_time),onTap:()=>pick(true)),const SizedBox(height:12),
+    ListTile(shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12),side:const BorderSide(color:Color(0xFF41516B))),title:const Text('End time'),subtitle:Text(fmt(end)),trailing:const Icon(Icons.access_time),onTap:()=>pick(false)),
+  ]));
+}
+
+// =====================================================
+// GROUPS / PROFILE / ABOUT
 // =====================================================
 
 class GroupsScreen extends StatelessWidget {
   const GroupsScreen({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(30),
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.groups,
-              size: 80,
-              color: Color(0xFFD4AF37),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Learning Groups',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Groups will allow Students, Teachers and Tutors to collaborate and share learning materials.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SafeArea(child:ListView(padding:const EdgeInsets.all(24),children:[
+    const _ScreenHeader(title:'Learning Groups',subtitle:'Collaborate and learn together.'),
+    const SizedBox(height:50),
+    const EmptyState(icon:Icons.groups,title:'Groups are coming soon',message:'StudyFlow Groups will allow students, teachers and tutors to collaborate and share learning materials.'),
+  ]));
 }
 
-// =====================================================
-// PROFILE
-// =====================================================
-
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
-  Future<Map<String, String>> loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    return {
-      'name': prefs.getString('profile_name') ?? 'StudyFlow User',
-      'role': prefs.getString('profile_role') ?? 'Offline User',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, String>>(
-      future: loadProfile(),
-      builder: (context, snapshot) {
-        final data = snapshot.data ??
-            {
-              'name': 'StudyFlow User',
-              'role': 'Offline User',
-            };
-
-        return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            const SizedBox(height: 20),
-
-            const CircleAvatar(
-              radius: 55,
-              backgroundColor: Color(0xFFD4AF37),
-              child: Icon(
-                Icons.person,
-                size: 65,
-                color: Color(0xFF0B1220),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            Text(
-              data['name']!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 5),
-
-            Text(
-              data['role']!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFFD4AF37),
-              ),
-            ),
-
-            const SizedBox(height: 35),
-
-            ListTile(
-              leading: const Icon(
-                Icons.info_outline,
-              ),
-              title: const Text('About StudyFlow'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AboutScreen(),
-                  ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(
-                Icons.logout,
-              ),
-              title: const Text('Logout'),
-              onTap: () async {
-                try {
-                  await FirebaseAuth.instance.signOut();
-                } catch (_) {}
-
-                if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const AuthChoiceScreen(),
-                    ),
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+  @override State<ProfileScreen> createState()=>_ProfileScreenState();
+}
+class _ProfileScreenState extends State<ProfileScreen>{
+  Future<Map<String,String>> load()async{final p=await SharedPreferences.getInstance();final u=FirebaseAuth.instance.currentUser;return {'name':u?.displayName??p.getString('profile_name')??'StudyFlow User','email':u?.email??'Offline mode','role':u==null?'Offline User':'StudyFlow Member'};}
+  @override Widget build(BuildContext context)=>SafeArea(child:FutureBuilder<Map<String,String>>(future:load(),builder:(_,s){final d=s.data??{'name':'StudyFlow User','email':'Loading...','role':'StudyFlow Member'};return ListView(padding:const EdgeInsets.all(24),children:[
+    const SizedBox(height:20),const CircleAvatar(radius:55,backgroundColor:Color(0xFFD4AF37),child:Icon(Icons.person,size:65,color:Color(0xFF0B1220))),const SizedBox(height:20),
+    Text(d['name']!,textAlign:TextAlign.center,style:const TextStyle(fontSize:25,fontWeight:FontWeight.bold)),const SizedBox(height:5),
+    Text(d['email']!,textAlign:TextAlign.center,style:const TextStyle(color:Color(0xFFE5E7EB))),const SizedBox(height:5),
+    Text(d['role']!,textAlign:TextAlign.center,style:const TextStyle(color:Color(0xFFD4AF37))),const SizedBox(height:35),
+    ListTile(leading:const Icon(Icons.info_outline),title:const Text('About StudyFlow'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AboutScreen()))),
+    ListTile(leading:const Icon(Icons.wifi),title:const Text('Connection status'),subtitle:const ConnectionStatus()),
+    ListTile(leading:const Icon(Icons.logout),title:const Text('Logout'),onTap:()async{try{await FirebaseAuth.instance.signOut();}catch(_){}if(context.mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const AuthChoiceScreen()),(_)=>false);}),
+  ]);} ));
 }
 
-// =====================================================
-// ABOUT
-// =====================================================
+class ConnectionStatus extends StatelessWidget {
+  const ConnectionStatus({super.key});
+  @override Widget build(BuildContext context)=>StreamBuilder<List<ConnectivityResult>>(stream:Connectivity().onConnectivityChanged,builder:(_,s){final online=(s.data??[]).any((x)=>x!=ConnectivityResult.none);return Text(online?'Internet connection available':'Offline mode',style:TextStyle(color:online?Colors.greenAccent:Colors.orangeAccent));});
+}
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('About StudyFlow'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const SizedBox(height: 30),
-
-          const Icon(
-            Icons.school_rounded,
-            size: 90,
-            color: Color(0xFFD4AF37),
-          ),
-
-          const SizedBox(height: 20),
-
-          const Text(
-            'STUDYFLOW',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          const Text(
-            'Your School Life, Organized.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFD4AF37),
-              fontSize: 17,
-            ),
-          ),
-
-          const SizedBox(height: 35),
-
-          const InfoCard(
-            icon: Icons.business_rounded,
-            title: 'Created by',
-            value: 'Cypher Digital Labs',
-          ),
-
-          const SizedBox(height: 14),
-
-          const InfoCard(
-            icon: Icons.design_services_rounded,
-            title: 'Designed by',
-            value: 'Papy',
-          ),
-
-          const SizedBox(height: 14),
-
-          const InfoCard(
-            icon: Icons.info_outline,
-            title: 'Version',
-            value: 'StudyFlow 3.0',
-          ),
-
-          const SizedBox(height: 40),
-
-          const Text(
-            'StudyFlow is an offline-first learning platform designed to help students, teachers and tutors organize notes, assignments, tasks and school schedules in one simple place.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFE5E7EB),
-              height: 1.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('About StudyFlow')),body:ListView(padding:const EdgeInsets.all(24),children:[
+    const SizedBox(height:30),const Icon(Icons.school_rounded,size:90,color:Color(0xFFD4AF37)),const SizedBox(height:20),
+    const Text('STUDYFLOW',textAlign:TextAlign.center,style:TextStyle(fontSize:32,fontWeight:FontWeight.bold)),const SizedBox(height:8),
+    const Text('Your School Life, Organized.',textAlign:TextAlign.center,style:TextStyle(color:Color(0xFFD4AF37),fontSize:17)),const SizedBox(height:35),
+    const InfoCard(icon:Icons.business_rounded,title:'Created by',value:'Cypher Digital Labs'),const SizedBox(height:14),
+    const InfoCard(icon:Icons.design_services_rounded,title:'Designed by',value:'Papy'),const SizedBox(height:14),
+    const InfoCard(icon:Icons.info_outline,title:'Version',value:'StudyFlow 3.0'),const SizedBox(height:40),
+    const Text('StudyFlow helps students keep their notes, tasks and school schedules organized in one beautiful place. Notes, tasks and timetables remain available offline.',textAlign:TextAlign.center,style:TextStyle(color:Color(0xFFE5E7EB),height:1.6)),
+  ]));
 }
 
 class InfoCard extends StatelessWidget {
-  final IconData icon;
+  final IconData icon; final String title,value;
+  const InfoCard({super.key,required this.icon,required this.title,required this.value});
+  @override Widget build(BuildContext context)=>Card(color:const Color(0xFF162238),child:ListTile(leading:Icon(icon,color:const Color(0xFFD4AF37)),title:Text(title,style:const TextStyle(color:Color(0xFFE5E7EB))),subtitle:Text(value,style:const TextStyle(fontSize:17,fontWeight:FontWeight.bold))));
+}
+
+// =====================================================
+// REUSABLE
+// =====================================================
+
+class _ScreenHeader extends StatelessWidget {
+  final String title, subtitle;
+  const _ScreenHeader({required this.title,required this.subtitle});
+  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text(title,style:const TextStyle(fontSize:32,fontWeight:FontWeight.bold)),const SizedBox(height:5),Text(subtitle,style:const TextStyle(color:Color(0xFFD4AF37))),
+  ]));
+}
+
+class EmptyState extends StatelessWidget {
+  final IconData icon; final String title,message;
+  const EmptyState({super.key,required this.icon,required this.title,required this.message});
+  @override Widget build(BuildContext context)=>Center(child:Padding(padding:const EdgeInsets.all(30),child:Column(mainAxisSize:MainAxisSize.min,children:[
+    Icon(icon,size:80,color:const Color(0xFFD4AF37)),const SizedBox(height:20),
+    Text(title,textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const SizedBox(height:10),
+    Text(message,textAlign:TextAlign.center,style:const TextStyle(color:Color(0xFFE5E7EB),height:1.5)),
+  ])));
+}
+
+class SectionTitle extends StatelessWidget {
   final String title;
-  final String value;
+  const SectionTitle({super.key,required this.title});
+  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:10),child:Text(title,style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)));
+}
 
-  const InfoCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: const Color(0xFFD4AF37),
-        ),
-        title: Text(title),
-        subtitle: Text(value),
-      ),
-    );
-  }
+String formatDate(DateTime date) {
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return '${date.day} ${months[date.month-1]} ${date.year}';
 }
