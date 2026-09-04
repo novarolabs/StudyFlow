@@ -33,25 +33,12 @@ jobs:
         run: flutter create --org com.cypherdigitallabs .
 
       - name: Add Firebase configuration
+        run: cp firebase/google-services.json android/app/google-services.json
+
+      - name: Configure Firebase plugin
         run: |
-          cp firebase/google-services.json android/app/google-services.json
-
-      - name: Configure Firebase Google Services plugin
-        run: |
-          if [ -f android/settings.gradle.kts ]; then
-            sed -i '/plugins {/a\
-    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
-
-            sed -i '/plugins {/a\
-    id("com.google.gms.google-services")' android/app/build.gradle.kts
-
-          elif [ -f android/build.gradle ]; then
-            sed -i '/dependencies {/a\
-        classpath "com.google.gms:google-services:4.4.2"' android/build.gradle
-
-            echo "" >> android/app/build.gradle
-            echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
-          fi
+          sed -i '/plugins {/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
+          sed -i '/plugins {/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
 
       - name: Get dependencies
         run: flutter pub get
