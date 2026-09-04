@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1699932885",
+    "project_id": "studyflow-97156",
+    "storage_bucket": "studyflow-97156.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1699932885:android:7e005422ef5259761f105c",
+        "android_client_info": {
+          "package_name": "com.cypherdigitallabs.studyflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJipbVJPW8Rt14awUIH3NQLcKTxg1c_ck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
