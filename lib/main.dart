@@ -830,6 +830,221 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
   }
 }
 
+// =====================================================
+// ACCOUNT
+// =====================================================
+
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseService.currentUser;
+
+    final displayName =
+        user?.displayName?.trim().isNotEmpty == true
+            ? user!.displayName!.trim()
+            : "StudyFlow User";
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 20),
+
+          const Text(
+            "Account",
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            "Manage your StudyFlow account and preferences.",
+            style: TextStyle(
+              color: Color(0xFFE5E7EB),
+              fontSize: 16,
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Account profile
+          Card(
+            color: const Color(0xFF162238),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Color(0xFFD4AF37),
+                    child: Icon(
+                      Icons.person,
+                      color: Color(0xFF121D2F),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user != null ? displayName : "Guest User",
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          user?.email ?? "Using StudyFlow offline",
+                          style: const TextStyle(
+                            color: Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          _AccountTile(
+            icon: Icons.security_rounded,
+            title: "Security",
+            subtitle: "Password and account security",
+            onTap: () {},
+          ),
+
+          _AccountTile(
+            icon: Icons.cloud_sync_rounded,
+            title: "Sync & Storage",
+            subtitle: "Manage cloud sync and local data",
+            onTap: () {},
+          ),
+
+          _AccountTile(
+            icon: Icons.settings_rounded,
+            title: "Settings",
+            subtitle: "Customize your StudyFlow experience",
+            onTap: () {},
+          ),
+
+          _AccountTile(
+            icon: Icons.info_outline_rounded,
+            title: "About StudyFlow",
+            subtitle: "App information and credits",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AboutScreen(),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          if (user != null)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final auth = FirebaseService.auth;
+                  if (auth == null) return;
+
+                  await auth.signOut();
+
+                  final prefs =
+                      await SharedPreferences.getInstance();
+
+                  await prefs.setBool(
+                    "studyflow_offline_mode",
+                    false,
+                  );
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text("Log Out"),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 30),
+
+          const Text(
+            "Apex Cypher Digital Labs • Designed by Papy",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFE5E7EB),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _AccountTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFF162238),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 6,
+        ),
+        leading: Icon(
+          icon,
+          color: const Color(0xFFD4AF37),
+          size: 28,
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(subtitle),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: Color(0xFFE5E7EB),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -859,7 +1074,7 @@ class _MainNavigationState extends State<MainNavigation> {
       case 3:
         return const TimetableScreen();
       case 4:
-        return const AboutScreen();
+        return const AccountScreen();
       default:
         return const HomeScreen(
           onNavigate: _defaultNavigation,
@@ -900,9 +1115,9 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Schedule',
           ),
           NavigationDestination(
-            icon: Icon(Icons.info_outline),
-            selectedIcon: Icon(Icons.info),
-            label: 'About',
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Account',
           ),
         ],
       ),
