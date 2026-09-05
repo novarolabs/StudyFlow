@@ -90,7 +90,7 @@ class _AppLoaderState extends State<AppLoader> {
       );
     }
 
-    return const MainNavigation();
+    return const AuthGate();
   }
 }
 
@@ -508,6 +508,326 @@ class StorageService {
 // =====================================================
 // MAIN NAVIGATION
 // =====================================================
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool? offlineMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOfflineMode();
+  }
+
+  Future<void> _loadOfflineMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getBool("studyflow_offline_mode") ?? false;
+    if (!mounted) return;
+    setState(() => offlineMode = value);
+  }
+
+  Future<void> _continueOffline() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("studyflow_offline_mode", true);
+    if (!mounted) return;
+    setState(() => offlineMode = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!FirebaseService.initialized) {
+      return const MainNavigation();
+    }
+
+    final auth = FirebaseService.auth;
+    if (auth == null) {
+      return const MainNavigation();
+    }
+
+    if (offlineMode == true && FirebaseService.currentUser == null) {
+      return const MainNavigation();
+    }
+
+    return StreamBuilder(
+      stream: auth.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          if (FirebaseService.currentUser != null) {
+            return const MainNavigation();
+          }
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.data != null) {
+          return const MainNavigation();
+        }
+
+        return AuthenticationScreen(onOffline: _continueOffline);
+      },
+    );
+  }
+}
+
+class AuthenticationScreen extends StatefulWidget {
+  final Future<void> Function() onOffline;
+
+  const AuthenticationScreen({
+    super.key,
+    required this.onOffline,
+  });
+
+  @override
+  State<AuthenticationScreen> createState() => _AuthenticationScreenState();
+}
+
+class _AuthenticationScreenState extends State<AuthenticationScreen> {
+  bool loginMode = true;
+  bool loading = false;
+  bool obscurePassword = true;
+
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  String _friendlyError(FirebaseAuthException e) {
+    switch (e.code) {
+      case "invalid-email":
+        return "Please enter a valid email address.";
+      case "user-not-found":
+      case "wrong-password":
+      case "invalid-credential":
+        return "Incorrect email or password.";
+      case "email-already-in-use":
+        return "An account with this email already exists.";
+      case "weak-password":
+        return "Password should be at least 6 characters.";
+      case "network-request-failed":
+        return "Network connection failed. You can continue offline.";
+      case "too-many-requests":
+        return "Too many attempts. Please try again later.";
+      default:
+        return e.message ?? "Authentication failed. Please try again.";
+    }
+  }
+
+  Future<void> _authenticate() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final name = nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (!loginMode && name.isEmpty)) {
+      _showMessage("Please fill in all required fields.");
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final auth = FirebaseService.auth;
+      if (auth == null) {
+        _showMessage("Firebase is unavailable. Please continue offline.");
+        return;
+      }
+
+      if (loginMode) {
+        await auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } else {
+        final credential = await auth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+
+        await credential.user?.updateDisplayName(name);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool("studyflow_offline_mode", false);
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showMessage(_friendlyError(e));
+    } catch (_) {
+      if (mounted) _showMessage("Something went wrong. Please try again.");
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 30),
+                  Icon(
+                    Icons.school_rounded,
+                    size: 72,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Welcome to StudyFlow",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    loginMode
+                        ? "Sign in to continue your learning journey."
+                        : "Create your StudyFlow account.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 30),
+                  if (!loginMode) ...[
+                    TextField(
+                      controller: nameController,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: "Name",
+                        prefixIcon: Icon(Icons.person_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: "Email",
+                      prefixIcon: Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    onSubmitted: (_) => _authenticate(),
+                    decoration: InputDecoration(
+                      labelText: "Password",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() => obscurePassword = !obscurePassword);
+                        },
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: loading ? null : _authenticate,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(loginMode ? "Sign In" : "Create Account"),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: loading
+                        ? null
+                        : () {
+                            setState(() => loginMode = !loginMode);
+                          },
+                    child: Text(
+                      loginMode
+                          ? "New to StudyFlow? Create an account"
+                          : "Already have an account? Sign in",
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: const [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text("OR"),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: loading
+                        ? null
+                        : () async {
+                            await widget.onOffline();
+                          },
+                    icon: const Icon(Icons.wifi_off_rounded),
+                    label: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text("Continue Offline"),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Your Notes, Tasks and Timetable remain available offline.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Apex Cypher Digital Labs • Designed by Papy",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
