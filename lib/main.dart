@@ -833,7 +833,156 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
 // =====================================================
 // ACCOUNT
 // =====================================================
+// =====================================================
+// SECURITY
+// =====================================================
 
+class SecurityScreen extends StatelessWidget {
+  const SecurityScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseService.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Security"),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Icon(
+            Icons.security_rounded,
+            size: 70,
+            color: Color(0xFFD4AF37),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            "Account Security",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Manage your StudyFlow account security.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFE5E7EB),
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          Card(
+            color: const Color(0xFF162238),
+            child: ListTile(
+              leading: const Icon(
+                Icons.email_outlined,
+                color: Color(0xFFD4AF37),
+              ),
+              title: const Text("Account Email"),
+              subtitle: Text(
+                user?.email ?? "No account signed in",
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Card(
+            color: const Color(0xFF162238),
+            child: ListTile(
+              leading: const Icon(
+                Icons.lock_reset_rounded,
+                color: Color(0xFFD4AF37),
+              ),
+              title: const Text("Reset Password"),
+              subtitle: const Text(
+                "Send a password reset email",
+              ),
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+              ),
+              onTap: () async {
+                final email = user?.email;
+
+                if (email == null || email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "Please sign in before resetting your password.",
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                final auth = FirebaseService.auth;
+
+                if (auth == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "Firebase is currently unavailable.",
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  await auth.sendPasswordResetEmail(
+                    email: email,
+                  );
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Password reset email sent to $email",
+                      ),
+                    ),
+                  );
+                } on FirebaseAuthException catch (e) {
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        e.message ??
+                            "Unable to send password reset email.",
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Card(
+            color: const Color(0xFF162238),
+            child: const ListTile(
+              leading: Icon(
+                Icons.verified_user_outlined,
+                color: Color(0xFFD4AF37),
+              ),
+              title: Text("Authentication"),
+              subtitle: Text(
+                "Your account is protected by Firebase Authentication.",
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
 
@@ -921,7 +1070,14 @@ class AccountScreen extends StatelessWidget {
             icon: Icons.security_rounded,
             title: "Security",
             subtitle: "Password and account security",
-            onTap: () {},
+            onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const SecurityScreen(),
+    ),
+  );
+},
           ),
 
           _AccountTile(
@@ -2941,7 +3097,6 @@ class AboutScreen extends StatelessWidget {
             value: "StudyFlow 3.1",
           ),
           const SizedBox(height: 14),
-          const AccountSection(),
           const SizedBox(height: 40),
           const Text(
             "StudyFlow helps students keep their notes, tasks and school schedules organized in one simple place.",
