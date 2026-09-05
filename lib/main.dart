@@ -2691,7 +2691,7 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text(
-            'STUDYFLOW',
+            "STUDYFLOW",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 32,
@@ -2700,7 +2700,7 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Your School Life, Organized.',
+            "Your School Life, Organized.",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFD4AF37),
@@ -2710,24 +2710,26 @@ class AboutScreen extends StatelessWidget {
           const SizedBox(height: 35),
           const InfoCard(
             icon: Icons.business_rounded,
-            title: 'Created by',
-            value: 'Apex Cypher Digital Labs',
+            title: "Created by",
+            value: "Apex Cypher Digital Labs",
           ),
           const SizedBox(height: 14),
           const InfoCard(
             icon: Icons.design_services_rounded,
-            title: 'Designed by',
-            value: 'Papy',
+            title: "Designed by",
+            value: "Papy",
           ),
           const SizedBox(height: 14),
           const InfoCard(
             icon: Icons.info_outline,
-            title: 'Version',
-            value: 'StudyFlow 3.0',
+            title: "Version",
+            value: "StudyFlow 3.1",
           ),
+          const SizedBox(height: 14),
+          const AccountSection(),
           const SizedBox(height: 40),
           const Text(
-            'StudyFlow helps students keep their notes, tasks and school schedules organized in one simple place.',
+            "StudyFlow helps students keep their notes, tasks and school schedules organized in one simple place.",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFE5E7EB),
@@ -2735,6 +2737,163 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AccountSection extends StatelessWidget {
+  const AccountSection({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    final auth = FirebaseService.auth;
+    if (auth == null) return;
+
+    await auth.signOut();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("studyflow_offline_mode", false);
+  }
+
+  Future<void> _openAuth(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("studyflow_offline_mode", false);
+
+    if (!context.mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AuthenticationScreen(
+          onOffline: () async {
+            await prefs.setBool("studyflow_offline_mode", true);
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseService.currentUser;
+
+    if (user != null) {
+      final displayName =
+          user.displayName?.trim().isNotEmpty == true
+              ? user.displayName!.trim()
+              : "StudyFlow User";
+
+      return Card(
+        color: const Color(0xFF162238),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.account_circle_rounded,
+                    color: Color(0xFFD4AF37),
+                    size: 30,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    "Account",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                displayName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                user.email ?? "No email available",
+                style: const TextStyle(
+                  color: Color(0xFFE5E7EB),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 18,
+                  ),
+                  SizedBox(width: 6),
+                  Text("Signed in"),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _logout(context),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text("Log Out"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      color: const Color(0xFF162238),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.wifi_off_rounded,
+                  color: Color(0xFFD4AF37),
+                  size: 30,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  "Offline Mode",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "You are currently using StudyFlow without an account. Your local data remains on this device.",
+              style: TextStyle(
+                color: Color(0xFFE5E7EB),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: FirebaseService.initialized
+                    ? () => _openAuth(context)
+                    : null,
+                icon: const Icon(Icons.login_rounded),
+                label: const Text("Sign In or Create Account"),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
