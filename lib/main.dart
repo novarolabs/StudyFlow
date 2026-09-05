@@ -836,7 +836,241 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> {
 // =====================================================
 // SECURITY
 // =====================================================
+// =====================================================
+// SYNC & STORAGE
+// =====================================================
 
+class SyncStorageScreen extends StatefulWidget {
+  const SyncStorageScreen({super.key});
+
+  @override
+  State<SyncStorageScreen> createState() => _SyncStorageScreenState();
+}
+
+class _SyncStorageScreenState extends State<SyncStorageScreen> {
+  bool offlineMode = false;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStorageStatus();
+  }
+
+  Future<void> _loadStorageStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final value =
+        prefs.getBool("studyflow_offline_mode") ?? false;
+
+    if (!mounted) return;
+
+    setState(() {
+      offlineMode = value;
+      loading = false;
+    });
+  }
+
+  Future<void> _toggleOfflineMode(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setBool(
+      "studyflow_offline_mode",
+      value,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      offlineMode = value;
+    });
+  }
+
+  Future<void> _clearLocalData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text("Clear local data?"),
+          content: const Text(
+            "This will remove StudyFlow data stored on this device. "
+            "Your Firebase account will not be deleted.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text("Cancel"),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text("Clear Data"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+await prefs.remove(notesKey);
+await prefs.remove(tasksKey);
+await prefs.remove(timetableKey);
+
+if (!mounted) return;
+
+    setState(() {
+      offlineMode = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Local StudyFlow data has been cleared."),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseService.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Sync & Storage"),
+      ),
+      body: loading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const Icon(
+                  Icons.cloud_sync_rounded,
+                  size: 70,
+                  color: Color(0xFFD4AF37),
+                ),
+
+                const SizedBox(height: 20),
+
+                const Text(
+                  "Sync & Storage",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  "Manage your local StudyFlow data and account sync.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFE5E7EB),
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: ListTile(
+                    leading: Icon(
+                      user != null
+                          ? Icons.cloud_done_rounded
+                          : Icons.cloud_off_rounded,
+                      color: const Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Cloud Account"),
+                    subtitle: Text(
+                      user != null
+                          ? "Signed in as ${user.email}"
+                          : "No cloud account is currently signed in.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: SwitchListTile(
+                    value: offlineMode,
+                    onChanged: _toggleOfflineMode,
+                    secondary: const Icon(
+                      Icons.wifi_off_rounded,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Offline Mode"),
+                    subtitle: const Text(
+                      "Keep StudyFlow focused on local device storage.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: const ListTile(
+                    leading: Icon(
+                      Icons.phone_android_rounded,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: Text("Local Storage"),
+                    subtitle: Text(
+                      "Your Notes, Tasks and Timetable data can remain "
+                      "stored locally on this device.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Clear Local Data"),
+                    subtitle: const Text(
+                      "Remove StudyFlow data stored on this device.",
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                    ),
+                    onTap: _clearLocalData,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                const Text(
+                  "Note: cloud synchronization of Notes, Tasks and "
+                  "Timetable will be added separately. Your Firebase "
+                  "account is already connected.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFE5E7EB),
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
 class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
 
@@ -982,6 +1216,261 @@ class SecurityScreen extends StatelessWidget {
       ),
     );
   }
+}// =====================================================
+// SETTINGS
+// =====================================================
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool compactMode = false;
+  bool notificationsEnabled = true;
+  bool confirmBeforeDeleting = true;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      compactMode =
+          prefs.getBool("studyflow_compact_mode") ?? false;
+
+      notificationsEnabled =
+          prefs.getBool("studyflow_notifications") ?? true;
+
+      confirmBeforeDeleting =
+          prefs.getBool("studyflow_confirm_delete") ?? true;
+
+      loading = false;
+    });
+  }
+
+  Future<void> _saveSetting(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  Future<void> _resetSettings() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text("Reset settings?"),
+          content: const Text(
+            "This will restore StudyFlow settings to their "
+            "default values. Your Notes, Tasks and Timetable "
+            "will not be deleted.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text("Cancel"),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text("Reset"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.remove("studyflow_compact_mode");
+    await prefs.remove("studyflow_notifications");
+    await prefs.remove("studyflow_confirm_delete");
+
+    if (!mounted) return;
+
+    setState(() {
+      compactMode = false;
+      notificationsEnabled = true;
+      confirmBeforeDeleting = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Settings restored to defaults."),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Settings"),
+      ),
+      body: loading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const Icon(
+                  Icons.settings_rounded,
+                  size: 70,
+                  color: Color(0xFFD4AF37),
+                ),
+
+                const SizedBox(height: 20),
+
+                const Text(
+                  "StudyFlow Settings",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  "Customize how StudyFlow works on your device.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFE5E7EB),
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: SwitchListTile(
+                    value: compactMode,
+                    onChanged: (value) async {
+                      setState(() {
+                        compactMode = value;
+                      });
+
+                      await _saveSetting(
+                        "studyflow_compact_mode",
+                        value,
+                      );
+                    },
+                    secondary: const Icon(
+                      Icons.view_compact_rounded,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Compact Mode"),
+                    subtitle: const Text(
+                      "Use a more compact layout where supported.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: SwitchListTile(
+                    value: notificationsEnabled,
+                    onChanged: (value) async {
+                      setState(() {
+                        notificationsEnabled = value;
+                      });
+
+                      await _saveSetting(
+                        "studyflow_notifications",
+                        value,
+                      );
+                    },
+                    secondary: const Icon(
+                      Icons.notifications_outlined,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Notifications"),
+                    subtitle: const Text(
+                      "Allow StudyFlow notifications when supported.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: SwitchListTile(
+                    value: confirmBeforeDeleting,
+                    onChanged: (value) async {
+                      setState(() {
+                        confirmBeforeDeleting = value;
+                      });
+
+                      await _saveSetting(
+                        "studyflow_confirm_delete",
+                        value,
+                      );
+                    },
+                    secondary: const Icon(
+                      Icons.delete_sweep_outlined,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Confirm Before Deleting"),
+                    subtitle: const Text(
+                      "Ask for confirmation before removing data.",
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                Card(
+                  color: const Color(0xFF162238),
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.restore_rounded,
+                      color: Color(0xFFD4AF37),
+                    ),
+                    title: const Text("Reset Settings"),
+                    subtitle: const Text(
+                      "Restore StudyFlow settings to their defaults.",
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                    ),
+                    onTap: _resetSettings,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                const Text(
+                  "Your settings are stored locally on this device.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFE5E7EB),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -1084,14 +1573,28 @@ class AccountScreen extends StatelessWidget {
             icon: Icons.cloud_sync_rounded,
             title: "Sync & Storage",
             subtitle: "Manage cloud sync and local data",
-            onTap: () {},
+            onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const SyncStorageScreen(),
+    ),
+  );
+},
           ),
 
           _AccountTile(
             icon: Icons.settings_rounded,
             title: "Settings",
             subtitle: "Customize your StudyFlow experience",
-            onTap: () {},
+            onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const SettingsScreen(),
+    ),
+  );
+},
           ),
 
           _AccountTile(
