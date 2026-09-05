@@ -918,9 +918,9 @@ class _SyncStorageScreenState extends State<SyncStorageScreen> {
 
     final prefs = await SharedPreferences.getInstance();
 
-await prefs.remove(notesKey);
-await prefs.remove(tasksKey);
-await prefs.remove(timetableKey);
+await prefs.remove(StorageService.notesKey);
+await prefs.remove(StorageService.tasksKey);
+await prefs.remove(StorageService.timetableKey);
 
 if (!mounted) return;
 
