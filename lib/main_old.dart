@@ -116,7 +116,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _WelcomePageData(
       icon: Icons.school_rounded,
       title: 'Welcome to StudyFlow',
-      description:
+          'Created by Cypher Digital Labs\nDesigned by Papy',description:
           'Your school life, organized. Keep your notes, tasks and timetable in one beautiful place.',
     ),
     _WelcomePageData(
@@ -129,7 +129,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       icon: Icons.rocket_launch_rounded,
       title: 'Built for Better Learning',
       description:
-          'Created by Apex Cypher Digital Labs\nDesigned by Papy',
+          'Created by Cypher Digital Labs\nDesigned by Papy',
     ),
   ];
 
@@ -158,6 +158,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final page = pages[currentPage];
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -538,13 +540,9 @@ class _MainNavigationState extends State<MainNavigation> {
       case 4:
         return const AboutScreen();
       default:
-        return const HomeScreen(
-          onNavigate: _defaultNavigation,
-        );
+        return const NotesScreen();
     }
   }
-
-  static void _defaultNavigation(int index) {}
 
   @override
   Widget build(BuildContext context) {
@@ -648,6 +646,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final greeting = greetingText();
+
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: loadDashboard,
@@ -655,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             Text(
-              greetingText(),
+              greeting,
               style: const TextStyle(
                 color: Color(0xFFD4AF37),
                 fontSize: 17,
@@ -719,17 +719,43 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 15),
-            QuickAction(
-              icon: Icons.note_add_outlined,
-              title: 'Create a new note',
-              subtitle: 'Capture an idea or study material',
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              tileColor: const Color(0xFF162238),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF253A5A),
+                child: Icon(
+                  Icons.note_add_outlined,
+                  color: Color(0xFFD4AF37),
+                ),
+              ),
+              title: const Text('Create a new note'),
+              subtitle: const Text(
+                'Capture an idea or study material',
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () => widget.onNavigate(1),
             ),
             const SizedBox(height: 12),
-            QuickAction(
-              icon: Icons.add_task,
-              title: 'Add a task',
-              subtitle: 'Keep track of homework and assignments',
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              tileColor: const Color(0xFF162238),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF253A5A),
+                child: Icon(
+                  Icons.add_task,
+                  color: Color(0xFFD4AF37),
+                ),
+              ),
+              title: const Text('Add a task'),
+              subtitle: const Text(
+                'Keep track of homework and assignments',
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () => widget.onNavigate(2),
             ),
           ],
@@ -853,45 +879,6 @@ class DashboardCard extends StatelessWidget {
                 ],
               ),
       ),
-    );
-  }
-}
-
-class QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const QuickAction({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-      tileColor: const Color(0xFF162238),
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFF253A5A),
-        child: Icon(
-          icon,
-          color: const Color(0xFFD4AF37),
-        ),
-      ),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 16,
-      ),
-      onTap: onTap,
     );
   }
 }
@@ -1251,7 +1238,9 @@ class _NoteEditorScreenState
     }
 
     final note = Note(
-      title: title.isEmpty ? 'Untitled Note' : title,
+      title: title.isEmpty
+          ? 'Untitled Note'
+          : title,
       content: content,
       updatedAt: DateTime.now(),
     );
@@ -1372,7 +1361,8 @@ class _TasksScreenState extends State<TasksScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => TaskEditorScreen(
+        builder: (context) =>
+            TaskEditorScreen(
           task: task,
           onSave: (savedTask) async {
             setState(() {
@@ -2118,10 +2108,8 @@ class _TimetableEditorScreenState
   late TextEditingController teacherController;
 
   String day = 'Monday';
-
   TimeOfDay startTime =
       const TimeOfDay(hour: 8, minute: 0);
-
   TimeOfDay endTime =
       const TimeOfDay(hour: 9, minute: 0);
 
@@ -2150,7 +2138,6 @@ class _TimetableEditorScreenState
     if (widget.item != null) {
       startTime =
           parseTime(widget.item!.startTime);
-
       endTime =
           parseTime(widget.item!.endTime);
     }
@@ -2175,7 +2162,6 @@ class _TimetableEditorScreenState
   String formatTime(TimeOfDay time) {
     final hour =
         time.hour.toString().padLeft(2, '0');
-
     final minute =
         time.minute.toString().padLeft(2, '0');
 
@@ -2385,22 +2371,25 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 35),
-          const InfoCard(
+            icon: Icons.business_rounded,
+  title: 'Created by',
+  value: 'Cypher Digital Labs',
+),InfoCard(
             icon: Icons.business_rounded,
             title: 'Created by',
-            value: 'Apex Cypher Digital Labs',
+            value: 'Cypher Digital Labs',
           ),
           const SizedBox(height: 14),
-          const InfoCard(
+          InfoCard(
             icon: Icons.design_services_rounded,
             title: 'Designed by',
             value: 'Papy',
           ),
           const SizedBox(height: 14),
-          const InfoCard(
+          InfoCard(
             icon: Icons.info_outline,
             title: 'Version',
-            value: 'StudyFlow 3.0',
+            value: 'StudyFlow 2.0',
           ),
           const SizedBox(height: 40),
           const Text(

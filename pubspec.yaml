@@ -1,5 +1,5 @@
 name: studyflow
-description: A modern offline-first learning platform by Cypher Digital Labs.
+description: A modern offline-first learning platform by Apex Cypher Digital Labs.
 publish_to: "none"
 
 version: 3.0.0+1
@@ -12,12 +12,6 @@ dependencies:
     sdk: flutter
 
   shared_preferences: ^2.5.3
-
-  firebase_core: ^3.15.2
-  firebase_auth: ^5.7.0
-  cloud_firestore: ^5.6.12
-
-  connectivity_plus: ^6.1.5
 
 dev_dependencies:
   flutter_test:
