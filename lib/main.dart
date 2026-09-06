@@ -1622,15 +1622,29 @@ class AccountScreen extends StatelessWidget {
                   final auth = FirebaseService.auth;
                   if (auth == null) return;
 
-                  await auth.signOut();
-
-                  final prefs =
-                      await SharedPreferences.getInstance();
-
+                  final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool(
                     "studyflow_offline_mode",
                     false,
                   );
+
+                  await auth.signOut();
+if (!context.mounted) return;
+
+Navigator.pushAndRemoveUntil(
+  context,
+  MaterialPageRoute(
+    builder: (_) => AuthenticationScreen(
+      onOffline: () async {
+        await prefs.setBool(
+          "studyflow_offline_mode",
+          true,
+        );
+      },
+    ),
+  ),
+  (route) => false,
+);
                 },
                 icon: const Icon(Icons.logout_rounded),
                 label: const Padding(
