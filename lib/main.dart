@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_service.dart';
+import 'firestore_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 Future<void> main() async {
@@ -2115,7 +2116,20 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> loadNotes() async {
-    final loadedNotes = await StorageService.loadNotes();
+    var loadedNotes = await StorageService.loadNotes();
+
+    if (loadedNotes.isEmpty && FirebaseService.currentUser != null) {
+      try {
+        final cloudNotes = await FirestoreService.loadNotes();
+        loadedNotes = cloudNotes
+            .map((data) => Note.fromJson(data))
+            .toList();
+
+        if (loadedNotes.isNotEmpty) {
+          await StorageService.saveNotes(loadedNotes);
+        }
+      } catch (_) {}
+    }
 
     loadedNotes.sort(
       (a, b) => b.updatedAt.compareTo(a.updatedAt),
@@ -2161,6 +2175,13 @@ class _NotesScreenState extends State<NotesScreen> {
     });
 
     await StorageService.saveNotes(notes);
+            if (FirebaseService.currentUser != null) {
+              try {
+                await FirestoreService.saveNotes(
+                  notes.map((note) => note.toJson()).toList(),
+                );
+              } catch (_) {}
+            }
   }
 
   Future<void> openEditor({
@@ -2186,6 +2207,13 @@ class _NotesScreenState extends State<NotesScreen> {
             });
 
             await StorageService.saveNotes(notes);
+            if (FirebaseService.currentUser != null) {
+              try {
+                await FirestoreService.saveNotes(
+                  notes.map((note) => note.toJson()).toList(),
+                );
+              } catch (_) {}
+            }
           },
         ),
       ),
