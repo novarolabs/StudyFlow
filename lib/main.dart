@@ -1715,10 +1715,15 @@ class _AccountTile extends StatelessWidget {
           Icons.chevron_right_rounded,
           color: Color(0xFFE5E7EB),
         ),
-        onTap: onTap,
       ),
     );
   }
+class MainNavigation extends StatefulWidget {        onTap: onTap,
+      ),
+    );
+  }
+}
+
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
