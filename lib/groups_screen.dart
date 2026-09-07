@@ -19,29 +19,38 @@ class _GroupsScreenState extends State<GroupsScreen> {
     _loadGroups();
   }
 
-  Future<void> _loadGroups() async {
-  try {
-    final documents = await GroupService.getMyGroups();
+    Future<void> _loadGroups() async {
+    try {
+      final documents = await GroupService.getMyGroups();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      groups = documents.map((doc) {
-        final data = doc.data() ?? <String, dynamic>{};
-        data['id'] = doc.id;
-        return data;
-      }).toList();
+      setState(() {
+        groups = documents.map((doc) {
+          final data = doc.data() ?? <String, dynamic>{};
+          data['id'] = doc.id;
+          return data;
+        }).toList();
 
-      loading = false;
-    });
-  } catch (_) {
-    if (!mounted) return;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
 
-    setState(() {
-      loading = false;
-    });
+      setState(() {
+        loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load groups: $e',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
-}
 
   Future<void> _openCreateGroup() async {
     final result = await Navigator.push(
