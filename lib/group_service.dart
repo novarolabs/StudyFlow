@@ -389,7 +389,79 @@ class GroupService {
 
     await batch.commit();
   }
+  // ============================================================
+  // DELETE GROUP
+  // ============================================================
 
+  static Future<void> deleteGroup(
+    String groupId,
+  ) async {
+    final user = currentUser;
+
+    if (user == null) {
+      throw Exception(
+        'No signed-in user.',
+      );
+    }
+
+    final groupRef =
+        groupsCollection.doc(groupId);
+
+    final groupSnapshot =
+        await groupRef.get();
+
+    if (!groupSnapshot.exists) {
+      throw Exception(
+        'Group not found.',
+      );
+    }
+
+    final groupData =
+        groupSnapshot.data();
+
+    if (groupData == null) {
+      throw Exception(
+        'Invalid group.',
+      );
+    }
+
+    if (groupData['ownerId'] != user.uid) {
+      throw Exception(
+        'Only the group owner can delete this group.',
+      );
+    }
+
+    final joinCode =
+        groupData['joinCode']?.toString();
+
+    // Get all members so their membership documents
+    // are removed together with the group.
+    final membersSnapshot =
+        await groupRef
+            .collection('members')
+            .get();
+
+    final batch = db.batch();
+
+    // Delete all member documents.
+    for (final member
+        in membersSnapshot.docs) {
+      batch.delete(member.reference);
+    }
+
+    // Delete the join code reservation.
+    if (joinCode != null &&
+        joinCode.isNotEmpty) {
+      batch.delete(
+        joinCodesCollection.doc(joinCode),
+      );
+    }
+
+    // Delete the group itself.
+    batch.delete(groupRef);
+
+    await batch.commit();
+  }
   // ============================================================
   // LEAVE GROUP
   // ============================================================
