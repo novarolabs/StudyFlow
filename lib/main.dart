@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_service.dart';
 import 'firestore_service.dart';
+import 'create_group_screen.dart';
+import 'groups_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 Future<void> main() async {
@@ -1717,8 +1719,6 @@ class _AccountTile extends StatelessWidget {
       ),
     );
   }
-}
-
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -1742,12 +1742,14 @@ class _MainNavigationState extends State<MainNavigation> {
           onNavigate: changePage,
         );
       case 1:
-        return const NotesScreen();
+        return const GroupsScreen();
       case 2:
-        return const TasksScreen();
+        return const NotesScreen();
       case 3:
-        return const TimetableScreen();
+        return const TasksScreen();
       case 4:
+        return const TimetableScreen();
+      case 5:
         return const AccountScreen();
       default:
         return const HomeScreen(
@@ -1774,6 +1776,11 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Home',
           ),
           NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Groups',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book),
             label: 'Notes',
@@ -1798,7 +1805,6 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
-
 // =====================================================
 // HOME
 // =====================================================
