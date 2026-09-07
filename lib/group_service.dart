@@ -1,424 +1,641 @@
-import 'dart:math';
+import 'package:flutter/material.dart';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'create_group_screen.dart';
+import 'group_service.dart';
 
-class GroupService {
-  static FirebaseFirestore get db =>
-      FirebaseFirestore.instance;
+class GroupsScreen extends StatefulWidget {
+  const GroupsScreen({super.key});
 
-  static User? get currentUser =>
-      FirebaseAuth.instance.currentUser;
+  @override
+  State<GroupsScreen> createState() => _GroupsScreenState();
+}
 
-  static CollectionReference<Map<String, dynamic>>
-      get groupsCollection => db.collection('groups');
+class _GroupsScreenState extends State<GroupsScreen> {
+  bool loading = true;
 
-  static CollectionReference<Map<String, dynamic>>
-      get joinCodesCollection => db.collection('joinCodes');
+  List<Map<String, dynamic>> groups = [];
 
-  // ============================================================
-  // JOIN CODE GENERATOR
-  // ============================================================
-
-  static String _generateJoinCode() {
-    const letters =
-        'ABCDEFGHJKLMNPQRSTUVWXYZ';
-
-    const numbers = '23456789';
-
-    final random = Random.secure();
-
-    final letter1 =
-        letters[random.nextInt(letters.length)];
-
-    final letter2 =
-        letters[random.nextInt(letters.length)];
-
-    final number1 =
-        numbers[random.nextInt(numbers.length)];
-
-    final number2 =
-        numbers[random.nextInt(numbers.length)];
-
-    final number3 =
-        numbers[random.nextInt(numbers.length)];
-
-    return '$letter1$letter2-$number1$number2$number3';
+  @override
+  void initState() {
+    super.initState();
+    _loadGroups();
   }
 
-  // ============================================================
-  // CREATE GROUP
-  // ============================================================
+  Future<void> _loadGroups() async {
+    try {
+      final documents =
+          await GroupService.getMyGroups();
 
-  static Future<String> createGroup({
-    required String name,
-    required String subject,
-    required String description,
-  }) async {
-    final user = currentUser;
+      if (!mounted) return;
 
-    if (user == null) {
-      throw Exception('No signed-in user.');
-    }
+      setState(() {
+        groups = documents.map((doc) {
+          final data =
+              doc.data() ?? <String, dynamic>{};
 
-    String? joinCode;
-    DocumentReference<Map<String, dynamic>>?
-        joinCodeRef;
+          data['id'] = doc.id;
 
-    // Reserve a unique join code.
-    for (var attempt = 0; attempt < 10; attempt++) {
-      final code = _generateJoinCode();
-      final codeRef =
-          joinCodesCollection.doc(code);
+          return data;
+        }).toList();
 
-      final existing =
-          await codeRef.get();
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
 
-      if (!existing.exists) {
-        joinCode = code;
-        joinCodeRef = codeRef;
-        break;
-      }
-    }
+      setState(() {
+        loading = false;
+      });
 
-    if (joinCode == null ||
-        joinCodeRef == null) {
-      throw Exception(
-        'Could not generate a unique join code.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load groups: $e',
+          ),
+        ),
       );
     }
-
-    final groupRef =
-        groupsCollection.doc();
-
-    final batch = db.batch();
-
-    // Create group.
-    batch.set(groupRef, {
-      'name': name.trim(),
-      'subject': subject.trim(),
-      'description': description.trim(),
-      'ownerId': user.uid,
-      'ownerName': user.displayName ?? '',
-      'joinCode': joinCode,
-      'createdAt':
-          FieldValue.serverTimestamp(),
-      'updatedAt':
-          FieldValue.serverTimestamp(),
-    });
-
-    // Create owner membership.
-    final memberRef = groupRef
-        .collection('members')
-        .doc(user.uid);
-
-    batch.set(memberRef, {
-      'userId': user.uid,
-      'name': user.displayName ?? '',
-      'email': user.email ?? '',
-      'role': 'owner',
-      'joinedAt':
-          FieldValue.serverTimestamp(),
-    });
-
-    // Reserve join code.
-    batch.set(joinCodeRef, {
-      'groupId': groupRef.id,
-      'createdAt':
-          FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    return groupRef.id;
   }
 
-  // ============================================================
-  // GET GROUP
-  // ============================================================
+  Future<void> _openCreateGroup() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            const CreateGroupScreen(),
+      ),
+    );
 
-  static Future<
-      DocumentSnapshot<Map<String, dynamic>>> getGroup(
-    String groupId,
-  ) async {
-    return groupsCollection
-        .doc(groupId)
-        .get();
+    if (result != null) {
+      await _loadGroups();
+    }
   }
 
-  // ============================================================
-  // JOIN GROUP
-  // ============================================================
+  void _showJoinGroupDialog() {
+    final controller = TextEditingController();
 
-  static Future<String> joinGroup({
-    required String joinCode,
-  }) async {
-    final user = currentUser;
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool joining = false;
 
-    if (user == null) {
-      throw Exception('No signed-in user.');
-    }
+        return StatefulBuilder(
+          builder: (
+            context,
+            setDialogState,
+          ) {
+            return AlertDialog(
+              backgroundColor:
+                  const Color(0xFF121D2F),
+              title: const Text(
+                'Join a Study Group',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+              content: TextField(
+                controller: controller,
+                textCapitalization:
+                    TextCapitalization.characters,
+                style: const TextStyle(
+                  color: Colors.white,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Join Code',
+                  hintText: 'e.g. AB-527',
+                  labelStyle: const TextStyle(
+                    color: Color(0xFFB8C2D1),
+                  ),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF6B7280),
+                  ),
+                  filled: true,
+                  fillColor:
+                      const Color(0xFF162238),
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: joining
+                      ? null
+                      : () =>
+                          Navigator.pop(
+                            dialogContext,
+                          ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFFB8C2D1),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: joining
+                      ? null
+                      : () async {
+                          final code =
+                              controller.text.trim();
 
-    final normalizedCode =
-        joinCode.trim().toUpperCase();
+                          if (code.isEmpty) {
+                            return;
+                          }
 
-    if (normalizedCode.isEmpty) {
-      throw Exception(
-        'Please enter a join code.',
-      );
-    }
+                          setDialogState(() {
+                            joining = true;
+                          });
 
-    // Look up the code in the dedicated
-    // join-code collection.
-    final codeSnapshot =
-        await joinCodesCollection
-            .doc(normalizedCode)
-            .get();
+                          try {
+                            await GroupService
+                                .joinGroup(
+                              joinCode: code,
+                            );
 
-    if (!codeSnapshot.exists) {
-      throw Exception('Group not found.');
-    }
+                            if (!mounted) return;
 
-    final codeData =
-        codeSnapshot.data();
+                            Navigator.pop(
+                              dialogContext,
+                            );
 
-    if (codeData == null ||
-        codeData['groupId'] == null) {
-      throw Exception(
-        'Invalid join code.',
-      );
-    }
+                            await _loadGroups();
 
-    final groupId =
-        codeData['groupId'].toString();
+                            if (!mounted) return;
 
-    final groupSnapshot =
-        await getGroup(groupId);
+                            ScaffoldMessenger.of(
+                              this.context,
+                            ).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'You joined the group successfully.',
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            setDialogState(() {
+                              joining = false;
+                            });
 
-    if (!groupSnapshot.exists) {
-      throw Exception(
-        'The group no longer exists.',
-      );
-    }
+                            if (!mounted) return;
 
-    final groupData =
-        groupSnapshot.data();
-
-    if (groupData == null) {
-      throw Exception(
-        'Invalid group.',
-      );
-    }
-
-    if (groupData['ownerId'] ==
-        user.uid) {
-      throw Exception(
-        'You already own this group.',
-      );
-    }
-
-    final memberRef = groupsCollection
-        .doc(groupId)
-        .collection('members')
-        .doc(user.uid);
-
-    final existingMember =
-        await memberRef.get();
-
-    if (existingMember.exists) {
-      throw Exception(
-        'You are already a member of this group.',
-      );
-    }
-
-    await memberRef.set({
-      'userId': user.uid,
-      'name': user.displayName ?? '',
-      'email': user.email ?? '',
-      'role': 'member',
-      'joinedAt':
-          FieldValue.serverTimestamp(),
-    });
-
-    return groupId;
+                            ScaffoldMessenger.of(
+                              this.context,
+                            ).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Could not join group: $e',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  style:
+                      ElevatedButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFFD4AF37),
+                    foregroundColor:
+                        const Color(0xFF0B1424),
+                  ),
+                  child: joining
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color:
+                                Color(0xFF0B1424),
+                          ),
+                        )
+                      : const Text('Join'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
-  // ============================================================
-  // GET MY GROUPS
-  // ============================================================
-
-  static Future<
-      List<DocumentSnapshot<Map<String, dynamic>>>>
-      getMyGroups() async {
-    final user = currentUser;
-
-    if (user == null) {
-      throw Exception(
-        'No signed-in user.',
-      );
-    }
-
-    final ownedGroups =
-        await groupsCollection
-            .where(
-              'ownerId',
-              isEqualTo: user.uid,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor:
+          const Color(0xFF0B1424),
+      appBar: AppBar(
+        title: const Text(
+          'Study Groups',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor:
+            const Color(0xFF0B1424),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _loadGroups,
+            icon: const Icon(
+              Icons.refresh_rounded,
+            ),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: loading
+          ? const Center(
+              child:
+                  CircularProgressIndicator(
+                color: Color(0xFFD4AF37),
+              ),
             )
-            .get();
-
-    final memberSnapshot =
-        await db
-            .collectionGroup('members')
-            .where(
-              'userId',
-              isEqualTo: user.uid,
-            )
-            .get();
-
-    final groups = <
-        String,
-        DocumentSnapshot<Map<String, dynamic>>>{
-    };
-
-    for (final document
-        in ownedGroups.docs) {
-      groups[document.id] =
-          document;
-    }
-
-    for (final memberDocument
-        in memberSnapshot.docs) {
-      final groupReference =
-          memberDocument.reference
-              .parent
-              .parent;
-
-      if (groupReference == null) {
-        continue;
-      }
-
-      final groupDocument =
-          await groupReference.get();
-
-      if (groupDocument.exists) {
-        groups[groupDocument.id] =
-            groupDocument;
-      }
-    }
-
-    return groups.values.toList();
+          : RefreshIndicator(
+              onRefresh: _loadGroups,
+              color:
+                  const Color(0xFFD4AF37),
+              child: groups.isEmpty
+                  ? _buildEmptyState()
+                  : _buildGroupsList(),
+            ),
+      floatingActionButton:
+          FloatingActionButton.extended(
+        onPressed: _openCreateGroup,
+        backgroundColor:
+            const Color(0xFFD4AF37),
+        foregroundColor:
+            const Color(0xFF0B1424),
+        icon: const Icon(
+          Icons.add_rounded,
+        ),
+        label: const Text(
+          'Create Group',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 
-  // ============================================================
-  // GET MEMBERS
-  // ============================================================
-
-  static Future<
-      QuerySnapshot<Map<String, dynamic>>>
-      getMembers(
-    String groupId,
-  ) async {
-    return groupsCollection
-        .doc(groupId)
-        .collection('members')
-        .orderBy('joinedAt')
-        .get();
+  Widget _buildEmptyState() {
+    return ListView(
+      physics:
+          const AlwaysScrollableScrollPhysics(),
+      padding:
+          const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 70),
+        Container(
+          width: 90,
+          height: 90,
+          decoration: BoxDecoration(
+            color:
+                const Color(0xFF162238),
+            borderRadius:
+                BorderRadius.circular(28),
+          ),
+          child: const Icon(
+            Icons.groups_rounded,
+            size: 48,
+            color:
+                Color(0xFFD4AF37),
+          ),
+        ),
+        const SizedBox(height: 28),
+        const Text(
+          'No Study Groups Yet',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Create a group for your class, '
+          'subject, study team, or classmates. '
+          'You will get a join code that you '
+          'can share with others.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFFB8C2D1),
+            fontSize: 15,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 30),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed:
+                _openCreateGroup,
+            icon: const Icon(
+              Icons.add_rounded,
+            ),
+            label: const Text(
+              'Create Your First Group',
+            ),
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  const Color(0xFFD4AF37),
+              foregroundColor:
+                  const Color(0xFF0B1424),
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  16,
+                ),
+              ),
+              textStyle:
+                  const TextStyle(
+                fontSize: 15,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed:
+              _showJoinGroupDialog,
+          icon: const Icon(
+            Icons.login_rounded,
+          ),
+          label: const Text(
+            'Join a Group',
+          ),
+          style:
+              OutlinedButton.styleFrom(
+            foregroundColor:
+                const Color(0xFFD4AF37),
+            side: const BorderSide(
+              color:
+                  Color(0xFFD4AF37),
+            ),
+            padding:
+                const EdgeInsets.symmetric(
+              vertical: 14,
+            ),
+            shape:
+                RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(
+                16,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
-  // ============================================================
-  // REMOVE MEMBER
-  // ============================================================
+  Widget _buildGroupsList() {
+    return ListView.builder(
+      physics:
+          const AlwaysScrollableScrollPhysics(),
+      padding:
+          const EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        100,
+      ),
+      itemCount: groups.length,
+      itemBuilder:
+          (context, index) {
+        final group = groups[index];
 
-  static Future<void> removeMember({
-    required String groupId,
-    required String userId,
-  }) async {
-    final user = currentUser;
+        final name =
+            group['name']?.toString() ??
+                'Unnamed Group';
 
-    if (user == null) {
-      throw Exception(
-        'No signed-in user.',
-      );
-    }
+        final subject =
+            group['subject']?.toString() ??
+                '';
 
-    final groupSnapshot =
-        await getGroup(groupId);
+        final description =
+            group['description']
+                    ?.toString() ??
+                '';
 
-    if (!groupSnapshot.exists) {
-      throw Exception(
-        'Group not found.',
-      );
-    }
+        final joinCode =
+            group['joinCode']
+                    ?.toString() ??
+                '';
 
-    final groupData =
-        groupSnapshot.data();
-
-    if (groupData == null ||
-        groupData['ownerId'] !=
-            user.uid) {
-      throw Exception(
-        'Only the group owner can remove members.',
-      );
-    }
-
-    if (userId == user.uid) {
-      throw Exception(
-        'The owner cannot remove themselves.',
-      );
-    }
-
-    await groupsCollection
-        .doc(groupId)
-        .collection('members')
-        .doc(userId)
-        .delete();
-  }
-
-  // ============================================================
-  // LEAVE GROUP
-  // ============================================================
-
-  static Future<void> leaveGroup(
-    String groupId,
-  ) async {
-    final user = currentUser;
-
-    if (user == null) {
-      throw Exception(
-        'No signed-in user.',
-      );
-    }
-
-    final groupSnapshot =
-        await getGroup(groupId);
-
-    if (!groupSnapshot.exists) {
-      throw Exception(
-        'Group not found.',
-      );
-    }
-
-    final groupData =
-        groupSnapshot.data();
-
-    if (groupData == null) {
-      throw Exception(
-        'Invalid group.',
-      );
-    }
-
-    if (groupData['ownerId'] ==
-        user.uid) {
-      throw Exception(
-        'The group owner cannot leave the group. '
-        'Delete the group instead.',
-      );
-    }
-
-    await groupsCollection
-        .doc(groupId)
-        .collection('members')
-        .doc(user.uid)
-        .delete();
+        return Card(
+          margin:
+              const EdgeInsets.only(
+            bottom: 16,
+          ),
+          color:
+              const Color(0xFF121D2F),
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
+            side: const BorderSide(
+              color:
+                  Color(0xFF263754),
+            ),
+          ),
+          child: Padding(
+            padding:
+                const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration:
+                          BoxDecoration(
+                        color:
+                            const Color(
+                          0xFFD4AF37,
+                        ),
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          16,
+                        ),
+                      ),
+                      child:
+                          const Icon(
+                        Icons
+                            .groups_rounded,
+                        color:
+                            Color(
+                          0xFF0B1424,
+                        ),
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(
+                      width: 14,
+                    ),
+                    Expanded(
+                      child:
+                          Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: [
+                          Text(
+                            name,
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors
+                                      .white,
+                              fontSize:
+                                  18,
+                              fontWeight:
+                                  FontWeight
+                                      .bold,
+                            ),
+                          ),
+                          if (subject
+                              .isNotEmpty)
+                            Padding(
+                              padding:
+                                  const EdgeInsets
+                                      .only(
+                                top: 4,
+                              ),
+                              child:
+                                  Text(
+                                subject,
+                                style:
+                                    const TextStyle(
+                                  color:
+                                      Color(
+                                    0xFFD4AF37,
+                                  ),
+                                  fontSize:
+                                      14,
+                                  fontWeight:
+                                      FontWeight
+                                          .w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (description
+                    .isNotEmpty) ...[
+                  const SizedBox(
+                    height: 16,
+                  ),
+                  Text(
+                    description,
+                    maxLines: 3,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(
+                      color:
+                          Color(
+                        0xFFB8C2D1,
+                      ),
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+                if (joinCode
+                    .isNotEmpty) ...[
+                  const SizedBox(
+                    height: 18,
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets
+                            .symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          const Color(
+                        0xFF0B1424,
+                      ),
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                        12,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.key_rounded,
+                          color:
+                              Color(
+                            0xFFD4AF37,
+                          ),
+                          size: 20,
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        const Text(
+                          'Join code:',
+                          style:
+                              TextStyle(
+                            color:
+                                Color(
+                              0xFFB8C2D1,
+                            ),
+                            fontSize:
+                                13,
+                          ),
+                        ),
+                        const SizedBox(
+                          width: 8,
+                        ),
+                        Text(
+                          joinCode,
+                          style:
+                              const TextStyle(
+                            color:
+                                Colors
+                                    .white,
+                            fontSize:
+                                15,
+                            fontWeight:
+                                FontWeight
+                                    .bold,
+                            letterSpacing:
+                                1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'create_group_screen.dart';
 import 'group_service.dart';
 
@@ -11,6 +12,7 @@ class GroupsScreen extends StatefulWidget {
 
 class _GroupsScreenState extends State<GroupsScreen> {
   bool loading = true;
+
   List<Map<String, dynamic>> groups = [];
 
   @override
@@ -19,16 +21,20 @@ class _GroupsScreenState extends State<GroupsScreen> {
     _loadGroups();
   }
 
-    Future<void> _loadGroups() async {
+  Future<void> _loadGroups() async {
     try {
-      final documents = await GroupService.getMyGroups();
+      final documents =
+          await GroupService.getMyGroups();
 
       if (!mounted) return;
 
       setState(() {
         groups = documents.map((doc) {
-          final data = doc.data() ?? <String, dynamic>{};
+          final data =
+              doc.data() ?? <String, dynamic>{};
+
           data['id'] = doc.id;
+
           return data;
         }).toList();
 
@@ -46,7 +52,6 @@ class _GroupsScreenState extends State<GroupsScreen> {
           content: Text(
             'Could not load groups: $e',
           ),
-          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -56,7 +61,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const CreateGroupScreen(),
+        builder: (_) =>
+            const CreateGroupScreen(),
       ),
     );
 
@@ -70,24 +76,33 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         bool joining = false;
 
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (
+            context,
+            setDialogState,
+          ) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF121D2F),
+              backgroundColor:
+                  const Color(0xFF121D2F),
               title: const Text(
                 'Join a Study Group',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                ),
               ),
               content: TextField(
                 controller: controller,
-                textCapitalization: TextCapitalization.characters,
-                style: const TextStyle(color: Colors.white),
+                textCapitalization:
+                    TextCapitalization.characters,
+                style: const TextStyle(
+                  color: Colors.white,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Join Code',
-                  hintText: 'e.g. MATH-7K42',
+                  hintText: 'e.g. AB-527',
                   labelStyle: const TextStyle(
                     color: Color(0xFFB8C2D1),
                   ),
@@ -95,9 +110,11 @@ class _GroupsScreenState extends State<GroupsScreen> {
                     color: Color(0xFF6B7280),
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF162238),
+                  fillColor:
+                      const Color(0xFF162238),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius:
+                        BorderRadius.circular(14),
                   ),
                 ),
               ),
@@ -105,7 +122,10 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 TextButton(
                   onPressed: joining
                       ? null
-                      : () => Navigator.pop(context),
+                      : () =>
+                          Navigator.pop(
+                            dialogContext,
+                          ),
                   child: const Text(
                     'Cancel',
                     style: TextStyle(
@@ -129,53 +149,64 @@ class _GroupsScreenState extends State<GroupsScreen> {
                           });
 
                           try {
-                            await GroupService.joinGroup(
+                            await GroupService
+                                .joinGroup(
                               joinCode: code,
                             );
 
-                            if (!context.mounted) return;
+                            if (!mounted) return;
 
-                            Navigator.pop(context);
+                            Navigator.pop(
+                              dialogContext,
+                            );
+
                             await _loadGroups();
 
                             if (!mounted) return;
 
-                            ScaffoldMessenger.of(this.context)
-                                .showSnackBar(
+                            ScaffoldMessenger.of(
+                              this.context,
+                            ).showSnackBar(
                               const SnackBar(
                                 content: Text(
                                   'You joined the group successfully.',
                                 ),
                               ),
                             );
-                          } catch (_) {
-                            if (!context.mounted) return;
-
+                          } catch (e) {
                             setDialogState(() {
                               joining = false;
                             });
 
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
-                              const SnackBar(
+                            if (!mounted) return;
+
+                            ScaffoldMessenger.of(
+                              this.context,
+                            ).showSnackBar(
+                              SnackBar(
                                 content: Text(
-                                  'Could not join the group. Check the join code and try again.',
+                                  'Could not join group: $e',
                                 ),
                               ),
                             );
                           }
                         },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: const Color(0xFF0B1424),
+                  style:
+                      ElevatedButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFFD4AF37),
+                    foregroundColor:
+                        const Color(0xFF0B1424),
                   ),
                   child: joining
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(
+                          child:
+                              CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFF0B1424),
+                            color:
+                                Color(0xFF0B1424),
                           ),
                         )
                       : const Text('Join'),
@@ -191,7 +222,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor:
+          const Color(0xFF0B1424),
       appBar: AppBar(
         title: const Text(
           'Study Groups',
@@ -199,35 +231,45 @@ class _GroupsScreenState extends State<GroupsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor:
+            const Color(0xFF0B1424),
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
             onPressed: _loadGroups,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(
+              Icons.refresh_rounded,
+            ),
             tooltip: 'Refresh',
           ),
         ],
       ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
+              child:
+                  CircularProgressIndicator(
                 color: Color(0xFFD4AF37),
               ),
             )
           : RefreshIndicator(
               onRefresh: _loadGroups,
-              color: const Color(0xFFD4AF37),
+              color:
+                  const Color(0xFFD4AF37),
               child: groups.isEmpty
                   ? _buildEmptyState()
                   : _buildGroupsList(),
             ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton:
+          FloatingActionButton.extended(
         onPressed: _openCreateGroup,
-        backgroundColor: const Color(0xFFD4AF37),
-        foregroundColor: const Color(0xFF0B1424),
-        icon: const Icon(Icons.add_rounded),
+        backgroundColor:
+            const Color(0xFFD4AF37),
+        foregroundColor:
+            const Color(0xFF0B1424),
+        icon: const Icon(
+          Icons.add_rounded,
+        ),
         label: const Text(
           'Create Group',
           style: TextStyle(
@@ -240,21 +282,26 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   Widget _buildEmptyState() {
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(24),
+      physics:
+          const AlwaysScrollableScrollPhysics(),
+      padding:
+          const EdgeInsets.all(24),
       children: [
         const SizedBox(height: 70),
         Container(
           width: 90,
           height: 90,
           decoration: BoxDecoration(
-            color: const Color(0xFF162238),
-            borderRadius: BorderRadius.circular(28),
+            color:
+                const Color(0xFF162238),
+            borderRadius:
+                BorderRadius.circular(28),
           ),
           child: const Icon(
             Icons.groups_rounded,
             size: 48,
-            color: Color(0xFFD4AF37),
+            color:
+                Color(0xFFD4AF37),
           ),
         ),
         const SizedBox(height: 28),
@@ -269,9 +316,10 @@ class _GroupsScreenState extends State<GroupsScreen> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Create a group for your class, subject, '
-          'study team, or classmates. You will get a '
-          'join code that you can share with others.',
+          'Create a group for your class, '
+          'subject, study team, or classmates. '
+          'You will get a join code that you '
+          'can share with others.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0xFFB8C2D1),
@@ -283,37 +331,64 @@ class _GroupsScreenState extends State<GroupsScreen> {
         SizedBox(
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: _openCreateGroup,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Create Your First Group'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37),
-              foregroundColor: const Color(0xFF0B1424),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            onPressed:
+                _openCreateGroup,
+            icon: const Icon(
+              Icons.add_rounded,
+            ),
+            label: const Text(
+              'Create Your First Group',
+            ),
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  const Color(0xFFD4AF37),
+              foregroundColor:
+                  const Color(0xFF0B1424),
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  16,
+                ),
               ),
-              textStyle: const TextStyle(
+              textStyle:
+                  const TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
           ),
         ),
         const SizedBox(height: 14),
         OutlinedButton.icon(
-          onPressed: _showJoinGroupDialog,
-          icon: const Icon(Icons.login_rounded),
-          label: const Text('Join a Group'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFFD4AF37),
+          onPressed:
+              _showJoinGroupDialog,
+          icon: const Icon(
+            Icons.login_rounded,
+          ),
+          label: const Text(
+            'Join a Group',
+          ),
+          style:
+              OutlinedButton.styleFrom(
+            foregroundColor:
+                const Color(0xFFD4AF37),
             side: const BorderSide(
-              color: Color(0xFFD4AF37),
+              color:
+                  Color(0xFFD4AF37),
             ),
-            padding: const EdgeInsets.symmetric(
+            padding:
+                const EdgeInsets.symmetric(
               vertical: 14,
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+            shape:
+                RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(
+                16,
+              ),
             ),
           ),
         ),
@@ -323,38 +398,60 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   Widget _buildGroupsList() {
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
+      physics:
+          const AlwaysScrollableScrollPhysics(),
+      padding:
+          const EdgeInsets.fromLTRB(
         20,
         12,
         20,
         100,
       ),
       itemCount: groups.length,
-      itemBuilder: (context, index) {
+      itemBuilder:
+          (context, index) {
         final group = groups[index];
 
         final name =
-            group['name']?.toString() ?? 'Unnamed Group';
+            group['name']?.toString() ??
+                'Unnamed Group';
+
         final subject =
-            group['subject']?.toString() ?? '';
+            group['subject']?.toString() ??
+                '';
+
         final description =
-            group['description']?.toString() ?? '';
+            group['description']
+                    ?.toString() ??
+                '';
+
         final joinCode =
-            group['joinCode']?.toString() ?? '';
+            group['joinCode']
+                    ?.toString() ??
+                '';
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          color: const Color(0xFF121D2F),
+          margin:
+              const EdgeInsets.only(
+            bottom: 16,
+          ),
+          color:
+              const Color(0xFF121D2F),
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+          shape:
+              RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
             side: const BorderSide(
-              color: Color(0xFF263754),
+              color:
+                  Color(0xFF263754),
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding:
+                const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
@@ -364,47 +461,75 @@ class _GroupsScreenState extends State<GroupsScreen> {
                     Container(
                       width: 52,
                       height: 52,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD4AF37),
+                      decoration:
+                          BoxDecoration(
+                        color:
+                            const Color(
+                          0xFFD4AF37,
+                        ),
                         borderRadius:
-                            BorderRadius.circular(16),
+                            BorderRadius
+                                .circular(
+                          16,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.groups_rounded,
-                        color: Color(0xFF0B1424),
+                      child:
+                          const Icon(
+                        Icons
+                            .groups_rounded,
+                        color:
+                            Color(
+                          0xFF0B1424,
+                        ),
                         size: 28,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(
+                      width: 14,
+                    ),
                     Expanded(
-                      child: Column(
+                      child:
+                          Column(
                         crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            CrossAxisAlignment
+                                .start,
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors
+                                      .white,
+                              fontSize:
+                                  18,
                               fontWeight:
-                                  FontWeight.bold,
+                                  FontWeight
+                                      .bold,
                             ),
                           ),
-                          if (subject.isNotEmpty)
+                          if (subject
+                              .isNotEmpty)
                             Padding(
                               padding:
-                                  const EdgeInsets.only(
+                                  const EdgeInsets
+                                      .only(
                                 top: 4,
                               ),
-                              child: Text(
+                              child:
+                                  Text(
                                 subject,
                                 style:
                                     const TextStyle(
                                   color:
-                                      Color(0xFFD4AF37),
-                                  fontSize: 14,
+                                      Color(
+                                    0xFFD4AF37,
+                                  ),
+                                  fontSize:
+                                      14,
                                   fontWeight:
-                                      FontWeight.w600,
+                                      FontWeight
+                                          .w600,
                                 ),
                               ),
                             ),
@@ -413,59 +538,93 @@ class _GroupsScreenState extends State<GroupsScreen> {
                     ),
                   ],
                 ),
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                if (description
+                    .isNotEmpty) ...[
+                  const SizedBox(
+                    height: 16,
+                  ),
                   Text(
                     description,
                     maxLines: 3,
                     overflow:
                         TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFB8C2D1),
+                    style:
+                        const TextStyle(
+                      color:
+                          Color(
+                        0xFFB8C2D1,
+                      ),
                       fontSize: 14,
                       height: 1.4,
                     ),
                   ),
                 ],
-                if (joinCode.isNotEmpty) ...[
-                  const SizedBox(height: 18),
+                if (joinCode
+                    .isNotEmpty) ...[
+                  const SizedBox(
+                    height: 18,
+                  ),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(
+                        const EdgeInsets
+                            .symmetric(
                       horizontal: 14,
                       vertical: 12,
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0B1424),
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          const Color(
+                        0xFF0B1424,
+                      ),
                       borderRadius:
-                          BorderRadius.circular(12),
+                          BorderRadius
+                              .circular(
+                        12,
+                      ),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           Icons.key_rounded,
                           color:
-                              Color(0xFFD4AF37),
+                              Color(
+                            0xFFD4AF37,
+                          ),
                           size: 20,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(
+                          width: 10,
+                        ),
                         const Text(
                           'Join code:',
-                          style: TextStyle(
+                          style:
+                              TextStyle(
                             color:
-                                Color(0xFFB8C2D1),
-                            fontSize: 13,
+                                Color(
+                              0xFFB8C2D1,
+                            ),
+                            fontSize:
+                                13,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 8,
+                        ),
                         Text(
                           joinCode,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
+                          style:
+                              const TextStyle(
+                            color:
+                                Colors
+                                    .white,
+                            fontSize:
+                                15,
                             fontWeight:
-                                FontWeight.bold,
-                            letterSpacing: 1.2,
+                                FontWeight
+                                    .bold,
+                            letterSpacing:
+                                1.2,
                           ),
                         ),
                       ],
