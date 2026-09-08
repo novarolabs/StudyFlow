@@ -184,6 +184,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
           },
         );
       }
+      );
+    }
 
   Future<void> _deleteGroup(Map<String, dynamic> group) async {
     final groupId = group['id']?.toString();
