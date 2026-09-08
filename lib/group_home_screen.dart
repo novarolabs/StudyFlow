@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'group_service.dart';
+import 'group_chat_screen.dart';
 
 class GroupHomeScreen extends StatefulWidget {
   final String groupId;
@@ -616,8 +617,14 @@ class _GroupHomeScreenState extends State<GroupHomeScreen> {
                         subtitle:
                             'Talk with classmates in real time.',
                         onTap: () {
-                          _showComingSoon(
-                            'Group Chat',
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GroupChatScreen(
+                                groupId: widget.groupId,
+                                groupName: groupName,
+                              ),
+                            ),
                           );
                         },
                       ),
