@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'create_group_screen.dart';
+import 'group_home_screen.dart';
 import 'group_service.dart';
 
 class GroupsScreen extends StatefulWidget {
@@ -182,11 +183,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
             );
           },
         );
-      },
-    ).then((_) {
-      controller.dispose();
-    });
-  }
+      }
 
   Future<void> _deleteGroup(Map<String, dynamic> group) async {
     final groupId = group['id']?.toString();
@@ -269,16 +266,26 @@ class _GroupsScreenState extends State<GroupsScreen> {
     }
   }
 
-  void _openGroup(Map<String, dynamic> group) {
-    final name = group['name']?.toString() ?? 'Study Group';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$name — Group Home will be added next.',
+  void _openGroup(Map<String, dynamic> group) async {
+    final groupId = group['id']?.toString();
+
+    if (groupId == null || groupId.isEmpty) {
+      return;
+    }
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupHomeScreen(
+          groupId: groupId,
         ),
       ),
     );
+
+    if (result == true) {
+      await _loadGroups();
+    }
   }
 
   @override
