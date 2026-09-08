@@ -151,111 +151,91 @@ class GroupService {
   // ============================================================
 
   static Future<String> joinGroup({
-    required String joinCode,
-  }) async {
-    final user = currentUser;
+  required String joinCode,
+}) async {
+  final user = currentUser;
 
-    if (user == null) {
-      throw Exception('No signed-in user.');
-    }
-
-    final normalizedCode =
-        joinCode.trim().toUpperCase();
-
-    if (normalizedCode.isEmpty) {
-      throw Exception(
-        'Please enter a join code.',
-      );
-    }
-
-    final codeSnapshot =
-        await joinCodesCollection
-            .doc(normalizedCode)
-            .get();
-
-    if (!codeSnapshot.exists) {
-      throw Exception('Group not found.');
-    }
-
-    final codeData =
-        codeSnapshot.data();
-
-    if (codeData == null ||
-        codeData['groupId'] == null) {
-      throw Exception(
-        'Invalid join code.',
-      );
-    }
-
-    final groupId =
-        codeData['groupId'].toString();
-
-    final groupSnapshot =
-        await getGroup(groupId);
-
-    if (!groupSnapshot.exists) {
-      throw Exception(
-        'The group no longer exists.',
-      );
-    }
-
-    final groupData =
-        groupSnapshot.data();
-
-    if (groupData == null) {
-      throw Exception(
-        'Invalid group.',
-      );
-    }
-
-    if (groupData['ownerId'] ==
-        user.uid) {
-      throw Exception(
-        'You already own this group.',
-      );
-    }
-
-    final memberRef = groupsCollection
-        .doc(groupId)
-        .collection('members')
-        .doc(user.uid);
-
-    final existingMember =
-        await memberRef.get();
-
-    if (existingMember.exists) {
-      throw Exception(
-        'You are already a member of this group.',
-      );
-    }
-
-    final batch = db.batch();
-
-    // Add member document.
-    batch.set(memberRef, {
-      'userId': user.uid,
-      'name': user.displayName ?? '',
-      'email': user.email ?? '',
-      'role': 'member',
-      'joinedAt':
-          FieldValue.serverTimestamp(),
-    });
-
-    // Add user to group memberIds.
-    batch.update(
-      groupsCollection.doc(groupId),
-      {
-        'memberIds':
-            FieldValue.arrayUnion([user.uid]),
-        'updatedAt':
-            FieldValue.serverTimestamp(),
-      },
-    );
-
-    await batch.commit();
-
-    return groupId;
+  if (user == null) {
+    throw Exception('No signed-in user.');
   }
+
+  final normalizedCode =
+      joinCode.trim().toUpperCase();
+
+  if (normalizedCode.isEmpty) {
+    throw Exception(
+      'Please enter a join code.',
+    );
+  }
+
+  // The join code is the authorization needed
+  // to enter the group.
+  final codeSnapshot =
+      await joinCodesCollection
+          .doc(normalizedCode)
+          .get();
+
+  if (!codeSnapshot.exists) {
+    throw Exception('Group not found.');
+  }
+
+  final codeData =
+      codeSnapshot.data();
+
+  if (codeData == null ||
+      codeData['groupId'] == null) {
+    throw Exception(
+      'Invalid join code.',
+    );
+  }
+
+  final groupId =
+      codeData['groupId'].toString();
+
+  final memberRef = groupsCollection
+      .doc(groupId)
+      .collection('members')
+      .doc(user.uid);
+
+  final batch = db.batch();
+
+  // Add the user to the group members.
+  batch.set(memberRef, {
+    'userId': user.uid,
+    'name': user.displayName ?? '',
+    'email': user.email ?? '',
+    'role': 'member',
+    'joinedAt':
+        FieldValue.serverTimestamp(),
+  });
+
+  // Add the user to the group's memberIds.
+  batch.update(
+    groupsCollection.doc(groupId),
+    {
+      'memberIds':
+          FieldValue.arrayUnion([user.uid]),
+      'updatedAt':
+          FieldValue.serverTimestamp(),
+    },
+  );
+
+  try {
+    await batch.commit();
+  } on FirebaseException catch (e) {
+    if (e.code == 'permission-denied') {
+      throw Exception(
+        'You could not join this group. '
+        'The group may no longer exist or '
+        'the join code may no longer be valid.',
+      );
+    }
+
+    rethrow;
+  }
+
+  return groupId;
+}
 
   // ============================================================
   // GET MY GROUPS
