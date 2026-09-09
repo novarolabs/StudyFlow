@@ -264,9 +264,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
     try {
       await _messagesCollection.doc(messageId).update({
-        text: newText.trim(),
-        edited: true,
-        editedAt: FieldValue.serverTimestamp(),
+          'text': newText.trim(),
+          'edited': true,
+          'editedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       if (!mounted) return;
@@ -635,6 +635,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ),
                 ),
               ),
+                ),
             ],
           ),
         ),
