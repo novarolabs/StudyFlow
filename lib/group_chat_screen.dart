@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'group_info_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -776,13 +777,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ),
             IconButton(
               onPressed: () {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    backgroundColor:
-                        Color(0xFF162238),
-                    content: Text(
-                      'Group info will be connected to Members.',
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GroupInfoScreen(
+                      groupId: widget.groupId,
                     ),
                   ),
                 );
