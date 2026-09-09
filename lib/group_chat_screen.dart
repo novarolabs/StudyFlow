@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'group_info_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
@@ -163,6 +164,244 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     return '$hour:$minute $period';
   }
 
+  Future<void> _copyMessage(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFF1A2940),
+        content: Text("Message copied"),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _deleteMessage(String messageId) async {
+    try {
+      await _messagesCollection.doc(messageId).delete();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF1A2940),
+          content: Text("Message deleted"),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1A2940),
+          content: Text("Could not delete message: $e"),
+        ),
+      );
+    }
+  }
+
+  Future<void> _editMessage(
+    String messageId,
+    String currentText,
+  ) async {
+    final controller = TextEditingController(text: currentText);
+
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF101E35),
+          title: const Text(
+            "Edit message",
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 5,
+            minLines: 1,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "Message",
+              hintStyle: const TextStyle(color: Color(0xFF8798B0)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFF31527E)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isEmpty) return;
+                Navigator.pop(dialogContext, value);
+              },
+              child: const Text(
+                "Save",
+                style: TextStyle(color: Color(0xFFFFD95A)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (newText == null || newText.trim().isEmpty) return;
+
+    try {
+      await _messagesCollection.doc(messageId).update({
+        text: newText.trim(),
+        edited: true,
+        editedAt: FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1A2940),
+          content: Text("Could not edit message: $e"),
+        ),
+      );
+    }
+  }
+
+  void _showMessageActions(
+    DocumentSnapshot<Map<String, dynamic>> document,
+    String text,
+    bool isMine,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1628),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF31527E),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _messageActionTile(
+                  icon: Icons.copy_rounded,
+                  title: "Copy",
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _copyMessage(text);
+                  },
+                ),
+                if (isMine) ...[
+                  _messageActionTile(
+                    icon: Icons.edit_rounded,
+                    title: "Edit",
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _editMessage(document.id, text);
+                    },
+                  ),
+                  _messageActionTile(
+                    icon: Icons.delete_outline_rounded,
+                    title: "Delete",
+                    destructive: true,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _confirmDeleteMessage(document.id);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _messageActionTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(
+        icon,
+        color: destructive
+            ? const Color(0xFFFF6B6B)
+            : const Color(0xFFFFD95A),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: destructive ? const Color(0xFFFF6B6B) : Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteMessage(String messageId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF101E35),
+          title: const Text(
+            "Delete message?",
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            "This message will be deleted for everyone in the group.",
+            style: TextStyle(color: Color(0xFFB8C5D8)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Color(0xFFFF6B6B)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteMessage(messageId);
+    }
+  }
+
   Widget _buildMessage(
     BuildContext context,
     DocumentSnapshot<Map<String, dynamic>> document,
@@ -236,7 +475,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                 const SizedBox(width: 8),
               ],
               Flexible(
-                child: Container(
+                child: GestureDetector(
+                  onLongPress: () => _showMessageActions(document, text, isMine),
+                  child: Container(
                   constraints: BoxConstraints(
                     maxWidth:
                         MediaQuery.of(context)
