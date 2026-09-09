@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'group_service.dart';
 import 'group_chat_screen.dart';
+import 'group_members_screen.dart';
 
 class GroupHomeScreen extends StatefulWidget {
   final String groupId;
@@ -645,8 +646,14 @@ class _GroupHomeScreenState extends State<GroupHomeScreen> {
                         subtitle:
                             'See everyone who belongs to this group.',
                         onTap: () {
-                          _showComingSoon(
-                            'Members',
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GroupMembersScreen(
+                                groupId: widget.groupId,
+                                groupName: groupName,
+                              ),
+                            ),
                           );
                         },
                       ),
