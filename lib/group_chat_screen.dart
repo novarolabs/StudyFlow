@@ -319,10 +319,12 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   _messageActionTile(
                     icon: Icons.edit_rounded,
                     title: "Edit",
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      _editMessage(document.id, text);
-                    },
+                      onTap: () async {
+                        Navigator.pop(sheetContext);
+                        await Future.delayed(const Duration(milliseconds: 350));
+                        if (!mounted) return;
+                        await _editMessage(document.id, text);
+                      },
                   ),
                   _messageActionTile(
                     icon: Icons.delete_outline_rounded,
