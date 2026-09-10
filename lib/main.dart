@@ -7,6 +7,7 @@ import 'firestore_service.dart';
 import 'create_group_screen.dart';
 import 'groups_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -522,6 +523,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool? offlineMode;
+  bool notificationsInitialized = false;
 
   @override
   void initState() {
@@ -571,7 +573,8 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         if (snapshot.data != null) {
-          return const MainNavigation();
+            _initializeNotifications();
+            return const MainNavigation();
         }
 
         return AuthenticationScreen(onOffline: _continueOffline);

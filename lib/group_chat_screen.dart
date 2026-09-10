@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'group_info_screen.dart';
+import 'notification_state_service.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -54,6 +55,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       vsync: this,
       duration: const Duration(seconds: 18),
     )..repeat();
+    NotificationStateService.markMessagesRead(widget.groupId);
   }
 
   @override

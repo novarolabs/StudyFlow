@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'group_service.dart';
 import 'group_chat_screen.dart';
 import 'group_members_screen.dart';
+import 'announcements_screen.dart';
 
 class GroupHomeScreen extends StatefulWidget {
   final String groupId;
@@ -318,7 +319,33 @@ class _GroupHomeScreenState extends State<GroupHomeScreen> {
     );
   }
 
-  Widget _buildFeatureCard({
+  Widget   icon: Icons.campaign_rounded,
+  title: 'Announcements',
+  subtitle: 'Important updates from your group',
+    Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AnnouncementsScreen(
+        groupId: widget.groupId,
+        groupName: groupName,
+        isOwner: isOwner,
+      ),
+    ),
+  );
+},
+onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AnnouncementsScreen(
+        groupId: widget.groupId,
+        groupName: groupName,
+        isOwner: isOwner,
+      ),
+    ),
+  );
+},
+),_buildFeatureCard({
     required IconData icon,
     required String title,
     required String subtitle,
